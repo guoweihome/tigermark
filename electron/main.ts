@@ -4,11 +4,26 @@ import {
   dialog,
   ipcMain,
   Menu,
+  protocol,
   shell,
 } from 'electron'
 import fs from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'tmfile',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true,
+      corsEnabled: true,
+    },
+  },
+])
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged
@@ -18,6 +33,8 @@ process.env.VITE_PUBLIC = app.isPackaged
 let mainWindow: BrowserWindow | null = null
 
 const MARKDOWN_EXTS = new Set(['.md', '.markdown', '.mdown', '.mkd', '.txt'])
+/** Paste-image attachment dirs — keep out of the markdown file tree. */
+const HIDDEN_DIRS = new Set(['assets', 'node_modules', '.git'])
 
 function createWindow() {
   const preloadCandidates = [
@@ -149,6 +166,7 @@ async function readDirectoryTree(dirPath: string, depth = 0): Promise<FileNode[]
 
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue
+    if (entry.isDirectory() && HIDDEN_DIRS.has(entry.name.toLowerCase())) continue
     const fullPath = path.join(dirPath, entry.name)
     if (entry.isDirectory()) {
       const children = await readDirectoryTree(fullPath, depth + 1)
@@ -190,6 +208,87 @@ function ok<T>(data: T) {
 function fail(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   return { ok: false as const, error: message }
+}
+
+function mimeToExt(mimeType: string) {
+  switch (mimeType) {
+    case 'image/jpeg':
+      return '.jpg'
+    case 'image/gif':
+      return '.gif'
+    case 'image/webp':
+      return '.webp'
+    case 'image/svg+xml':
+      return '.svg'
+    case 'image/png':
+    default:
+      return '.png'
+  }
+}
+
+function extToMime(ext: string) {
+  switch (ext.toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.gif':
+      return 'image/gif'
+    case '.webp':
+      return 'image/webp'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.png':
+    default:
+      return 'image/png'
+  }
+}
+
+function pasteImageName(mimeType: string) {
+  const now = new Date()
+  const stamp = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    '-',
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+  ].join('')
+  const rand = Math.random().toString(36).slice(2, 6)
+  return `paste-${stamp}-${rand}${mimeToExt(mimeType)}`
+}
+
+function parseTmfilePath(requestUrl: string) {
+  const url = new URL(requestUrl)
+  let filePath = decodeURIComponent(url.pathname)
+
+  // standard scheme may put drive/host in hostname on some platforms
+  if (url.hostname && url.hostname !== 'localhost') {
+    filePath = `/${url.hostname}${filePath}`
+  }
+
+  if (process.platform === 'win32' && /^\/[A-Za-z]:/.test(filePath)) {
+    filePath = filePath.slice(1)
+  }
+
+  return filePath
+}
+
+function registerFileProtocol() {
+  protocol.handle('tmfile', async (request) => {
+    try {
+      const filePath = parseTmfilePath(request.url)
+      const data = await fs.readFile(filePath)
+      return new Response(data, {
+        headers: {
+          'Content-Type': extToMime(path.extname(filePath)),
+          'Cache-Control': 'no-cache',
+        },
+      })
+    } catch {
+      return new Response('Not Found', { status: 404, statusText: 'Not Found' })
+    }
+  })
 }
 
 function registerIpc() {
@@ -294,9 +393,29 @@ function registerIpc() {
       }
     },
   )
+
+  ipcMain.handle(
+    'fs:saveImage',
+    async (_event, mdFilePath: string, bytes: ArrayBuffer, mimeType: string) => {
+      try {
+        const assetsDir = path.join(path.dirname(mdFilePath), 'assets')
+        await fs.mkdir(assetsDir, { recursive: true })
+        const fileName = pasteImageName(mimeType || 'image/png')
+        const absolutePath = path.join(assetsDir, fileName)
+        await fs.writeFile(absolutePath, Buffer.from(bytes))
+        return ok({
+          absolutePath,
+          relativePath: `assets/${fileName}`,
+        })
+      } catch (error) {
+        return fail(error)
+      }
+    },
+  )
 }
 
 app.whenReady().then(() => {
+  registerFileProtocol()
   registerIpc()
   buildMenu()
   createWindow()

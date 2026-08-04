@@ -4,17 +4,35 @@ import { EditorState } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language'
+import { EditorToolbar } from './EditorToolbar'
+import {
+  applyHeading,
+  formatJson,
+  headingInputHandler,
+  insertTable,
+} from '../editor/commands'
 
 interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
+  onPasteImage?: (file: File) => Promise<string | null>
+  onMessage?: (message: string) => void
 }
 
-export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
+export function MarkdownEditor({
+  value,
+  onChange,
+  onPasteImage,
+  onMessage,
+}: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
+  const onPasteImageRef = useRef(onPasteImage)
+  const onMessageRef = useRef(onMessage)
   onChangeRef.current = onChange
+  onPasteImageRef.current = onPasteImage
+  onMessageRef.current = onMessage
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -23,6 +41,36 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
       if (update.docChanged) {
         onChangeRef.current(update.state.doc.toString())
       }
+    })
+
+    const pasteHandler = EditorView.domEventHandlers({
+      paste(event, view) {
+        const handler = onPasteImageRef.current
+        const clipboard = event.clipboardData
+        if (!handler || !clipboard) return false
+
+        const imageItem = Array.from(clipboard.items).find((item) =>
+          item.type.startsWith('image/'),
+        )
+        if (!imageItem) return false
+
+        const file = imageItem.getAsFile()
+        if (!file) return false
+
+        event.preventDefault()
+        void (async () => {
+          const markdownPath = await handler(file)
+          if (!markdownPath) return
+          const insert = `![image](${markdownPath})`
+          const pos = view.state.selection.main.head
+          view.dispatch({
+            changes: { from: pos, to: view.state.selection.main.to, insert },
+            selection: { anchor: pos + insert.length },
+          })
+          view.focus()
+        })()
+        return true
+      },
     })
 
     const state = EditorState.create({
@@ -36,7 +84,9 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
+        EditorView.inputHandler.of(headingInputHandler),
         updateListener,
+        pasteHandler,
         EditorView.theme({
           '&': {
             height: '100%',
@@ -98,5 +148,26 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
     }
   }, [value])
 
-  return <div className="cm-host" ref={hostRef} />
+  const withView = (fn: (view: EditorView) => void) => {
+    const view = viewRef.current
+    if (!view) return
+    fn(view)
+  }
+
+  return (
+    <div className="editor-shell">
+      <EditorToolbar
+        onHeading={(level) => withView((view) => applyHeading(view, level))}
+        onInsertTable={() => withView(insertTable)}
+        onFormatJson={() =>
+          withView((view) => {
+            const result = formatJson(view)
+            if (!result.ok) onMessageRef.current?.(result.error)
+            else onMessageRef.current?.('JSON 已格式化')
+          })
+        }
+      />
+      <div className="cm-host" ref={hostRef} />
+    </div>
+  )
 }

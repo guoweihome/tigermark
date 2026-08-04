@@ -15,6 +15,8 @@ const api = {
     ipcRenderer.invoke('fs:deletePath', targetPath),
   renamePath: (oldPath: string, newName: string) =>
     ipcRenderer.invoke('fs:renamePath', oldPath, newName),
+  saveImage: (mdFilePath: string, bytes: ArrayBuffer, mimeType: string) =>
+    ipcRenderer.invoke('fs:saveImage', mdFilePath, bytes, mimeType),
   platform: process.platform,
   onMenuOpenDirectory: (cb: () => void) => {
     const listener = () => cb()

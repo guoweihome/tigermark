@@ -13,6 +13,11 @@ export interface ApiResult<T> {
   error?: string
 }
 
+export interface SavedImage {
+  absolutePath: string
+  relativePath: string
+}
+
 export type ViewMode = 'edit' | 'split' | 'preview'
 
 export interface TigerMarkApi {
@@ -24,6 +29,11 @@ export interface TigerMarkApi {
   createDirectory: (dirPath: string, name: string) => Promise<ApiResult<string>>
   deletePath: (targetPath: string) => Promise<ApiResult<void>>
   renamePath: (oldPath: string, newName: string) => Promise<ApiResult<string>>
+  saveImage: (
+    mdFilePath: string,
+    bytes: ArrayBuffer,
+    mimeType: string,
+  ) => Promise<ApiResult<SavedImage>>
   platform: string
   onMenuOpenDirectory: (cb: () => void) => () => void
   onMenuSave: (cb: () => void) => () => void

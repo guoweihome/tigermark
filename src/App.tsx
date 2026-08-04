@@ -3,11 +3,23 @@ import type { FileEntry, ViewMode } from './vite-env'
 import { FileTree } from './components/FileTree'
 import { MarkdownEditor } from './components/MarkdownEditor'
 import { MarkdownPreview } from './components/MarkdownPreview'
+import { NameDialog } from './components/NameDialog'
 import { Toolbar } from './components/Toolbar'
 
 function basename(filePath: string) {
   return filePath.split(/[/\\]/).pop() ?? filePath
 }
+
+function dirname(filePath: string) {
+  const normalized = filePath.replace(/\\/g, '/')
+  const index = normalized.lastIndexOf('/')
+  return index === -1 ? normalized : normalized.slice(0, index)
+}
+
+type NamePrompt =
+  | { kind: 'createFile'; dirPath: string }
+  | { kind: 'createFolder'; dirPath: string }
+  | { kind: 'rename'; entry: FileEntry }
 
 export default function App() {
   const [rootPath, setRootPath] = useState<string | null>(null)
@@ -18,6 +30,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [status, setStatus] = useState('打开一个文件夹开始编辑')
   const [sidebarWidth, setSidebarWidth] = useState(260)
+  const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null)
   const savingRef = useRef(false)
   const contentRef = useRef(content)
   const activePathRef = useRef(activePath)
@@ -93,34 +106,40 @@ export default function App() {
     setDirty(true)
   }, [])
 
-  const createFile = useCallback(
-    async (dirPath: string) => {
-      const name = window.prompt('新文件名（可省略 .md）', 'untitled')
-      if (!name) return
-      const result = await window.tigermark.createFile(dirPath, name)
-      if (!result.ok || !result.data) {
-        setStatus(result.error ?? '创建文件失败')
-        return
+  const handlePasteImage = useCallback(
+    async (file: File) => {
+      const mdPath = activePathRef.current
+      if (!mdPath) {
+        setStatus('请先打开一个 Markdown 文件再粘贴图片')
+        return null
       }
-      if (rootPath) await refreshTree(rootPath)
-      await openFile(result.data)
+      const bytes = await file.arrayBuffer()
+      const result = await window.tigermark.saveImage(
+        mdPath,
+        bytes,
+        file.type || 'image/png',
+      )
+      if (!result.ok || !result.data) {
+        setStatus(result.error ?? '保存图片失败')
+        return null
+      }
+      setStatus(`已插入图片 · ${result.data.relativePath}`)
+      return result.data.relativePath
     },
-    [openFile, refreshTree, rootPath],
+    [],
   )
 
-  const createFolder = useCallback(
-    async (dirPath: string) => {
-      const name = window.prompt('新文件夹名')
-      if (!name) return
-      const result = await window.tigermark.createDirectory(dirPath, name)
-      if (!result.ok) {
-        setStatus(result.error ?? '创建文件夹失败')
-        return
-      }
-      if (rootPath) await refreshTree(rootPath)
-    },
-    [refreshTree, rootPath],
-  )
+  const createFile = useCallback((dirPath: string) => {
+    setNamePrompt({ kind: 'createFile', dirPath })
+  }, [])
+
+  const createFolder = useCallback((dirPath: string) => {
+    setNamePrompt({ kind: 'createFolder', dirPath })
+  }, [])
+
+  const renameEntry = useCallback((entry: FileEntry) => {
+    setNamePrompt({ kind: 'rename', entry })
+  }, [])
 
   const deleteEntry = useCallback(
     async (entry: FileEntry) => {
@@ -142,21 +161,45 @@ export default function App() {
     [refreshTree, rootPath],
   )
 
-  const renameEntry = useCallback(
-    async (entry: FileEntry) => {
-      const name = window.prompt('重命名为', entry.name)
-      if (!name || name === entry.name) return
-      const result = await window.tigermark.renamePath(entry.path, name)
+  const handleNameConfirm = useCallback(
+    async (prompt: NamePrompt, name: string) => {
+      setNamePrompt(null)
+
+      if (prompt.kind === 'createFile') {
+        const result = await window.tigermark.createFile(prompt.dirPath, name)
+        if (!result.ok || !result.data) {
+          setStatus(result.error ?? '创建文件失败')
+          return
+        }
+        if (rootPath) await refreshTree(rootPath)
+        await openFile(result.data)
+        return
+      }
+
+      if (prompt.kind === 'createFolder') {
+        const result = await window.tigermark.createDirectory(prompt.dirPath, name)
+        if (!result.ok) {
+          setStatus(result.error ?? '创建文件夹失败')
+          return
+        }
+        if (rootPath) await refreshTree(rootPath)
+        setStatus(`已创建文件夹 ${name}`)
+        return
+      }
+
+      if (name === prompt.entry.name) return
+      const result = await window.tigermark.renamePath(prompt.entry.path, name)
       if (!result.ok || !result.data) {
         setStatus(result.error ?? '重命名失败')
         return
       }
-      if (activePathRef.current === entry.path) {
+      if (activePathRef.current === prompt.entry.path) {
         setActivePath(result.data)
       }
       if (rootPath) await refreshTree(rootPath)
+      setStatus(`已重命名为 ${name}`)
     },
-    [refreshTree, rootPath],
+    [openFile, refreshTree, rootPath],
   )
 
   useEffect(() => {
@@ -293,13 +336,15 @@ export default function App() {
                     key={activePath}
                     value={content}
                     onChange={handleContentChange}
+                    onPasteImage={handlePasteImage}
+                    onMessage={setStatus}
                   />
                 </section>
               )}
               {viewMode === 'split' && <div className="pane-divider" />}
               {showPreview && (
                 <section className="pane preview-pane">
-                  <MarkdownPreview content={content} />
+                  <MarkdownPreview content={content} baseDir={dirname(activePath)} />
                 </section>
               )}
             </div>
@@ -323,6 +368,37 @@ export default function App() {
         <span>{status}</span>
         <span>{dirty ? '未保存' : '已同步'}</span>
       </footer>
+
+      {namePrompt?.kind === 'createFile' && (
+        <NameDialog
+          title="新建文件"
+          label="文件名（可省略 .md）"
+          defaultValue="untitled"
+          confirmLabel="创建"
+          onConfirm={(name) => void handleNameConfirm(namePrompt, name)}
+          onCancel={() => setNamePrompt(null)}
+        />
+      )}
+      {namePrompt?.kind === 'createFolder' && (
+        <NameDialog
+          title="新建文件夹"
+          label="文件夹名"
+          defaultValue="new-folder"
+          confirmLabel="创建"
+          onConfirm={(name) => void handleNameConfirm(namePrompt, name)}
+          onCancel={() => setNamePrompt(null)}
+        />
+      )}
+      {namePrompt?.kind === 'rename' && (
+        <NameDialog
+          title="重命名"
+          label="新名称"
+          defaultValue={namePrompt.entry.name}
+          confirmLabel="重命名"
+          onConfirm={(name) => void handleNameConfirm(namePrompt, name)}
+          onCancel={() => setNamePrompt(null)}
+        />
+      )}
     </div>
   )
 }
