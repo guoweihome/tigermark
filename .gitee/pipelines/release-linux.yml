@@ -1,0 +1,75 @@
+# TigerMark · Gitee Go 自动打包发版
+#
+# 用法：
+# 1. 打开 https://gitee.com/pytiger/tigermark →「流水线 / Gitee Go」
+# 2. 新建流水线 → 选择「YAML 配置」→ 粘贴本文件内容
+# 3. 触发方式建议设为：推送 Tag（如 v1.0.0）时自动运行
+# 4. 首次运行前确认已开通 Gitee Go，并具备创建发行版权限
+#
+# 说明：
+# - 云端默认是 Linux，只能打 AppImage / deb
+# - macOS .dmg、Windows .exe 请在本机对应系统执行 npm run dist 后手动上传发行版附件
+# - 单附件建议 < 100MB
+
+name: release-linux
+displayName: TigerMark Linux 打包发版
+
+triggers:
+  push:
+    branches:
+      exclude:
+        - '**'
+    tags:
+      include:
+        - 'v*'
+
+stages:
+  - name: build
+    displayName: 构建
+    trigger: auto
+    steps:
+      - step: build@nodejs
+        name: build_linux
+        displayName: Node.js 打包
+        # 若插件表单要求选择 Node 版本，选 20 LTS
+        nodeVersion: 20.11.1
+        commands:
+          - node -v && npm -v
+          - npm ci
+          - npm run build
+          - npx electron-builder --linux AppImage deb --publish never
+          - ls -lah release/
+        artifacts:
+          - name: TIGERMARK_LINUX
+            path:
+              - release/*.AppImage
+              - release/*.deb
+        caches:
+          - node_modules
+
+  - name: publish
+    displayName: 发版
+    trigger: auto
+    steps:
+      - step: release@gitee
+        name: release_gitee
+        displayName: 上传到 Gitee 发行版
+        # Tag 使用触发流水线的 Git Tag；若插件不支持自动读取，改为 ${GITEE_TAG}
+        tagName: ${GITEE_TAG}
+        releaseName: TigerMark ${GITEE_TAG}
+        description: |
+          ## TigerMark ${GITEE_TAG}
+
+          ### Linux 安装包（流水线自动构建）
+          - `.AppImage`：赋予执行权限后直接运行
+          - `.deb`：`sudo dpkg -i xxx.deb`
+
+          ### macOS / Windows
+          请从本发行版附件中下载对应平台安装包（如由维护者本机打包上传）。
+        upstreamArtifact:
+          - TIGERMARK_LINUX
+        assertFiles:
+          - release/*.AppImage
+          - release/*.deb
+        prerelease: false
+        allowUpdate: true

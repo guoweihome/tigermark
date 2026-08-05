@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language'
+import { bracketMatching } from '@codemirror/language'
 import { EditorToolbar } from './EditorToolbar'
 import {
   applyHeading,
@@ -11,10 +11,12 @@ import {
   headingInputHandler,
   insertTable,
 } from '../editor/commands'
+import { editorThemeExtensions } from '../editor/theme'
 
 interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
+  theme?: 'light' | 'dark'
   onPasteImage?: (file: File) => Promise<string | null>
   onMessage?: (message: string) => void
 }
@@ -22,11 +24,13 @@ interface MarkdownEditorProps {
 export function MarkdownEditor({
   value,
   onChange,
+  theme = 'light',
   onPasteImage,
   onMessage,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const themeCompartment = useRef(new Compartment())
   const onChangeRef = useRef(onChange)
   const onPasteImageRef = useRef(onPasteImage)
   const onMessageRef = useRef(onMessage)
@@ -81,46 +85,12 @@ export function MarkdownEditor({
         history(),
         bracketMatching(),
         markdown(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorView.inputHandler.of(headingInputHandler),
         updateListener,
         pasteHandler,
-        EditorView.theme({
-          '&': {
-            height: '100%',
-            fontSize: '14.5px',
-          },
-          '.cm-scroller': {
-            fontFamily:
-              '"JetBrains Mono", "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace',
-            lineHeight: '1.65',
-          },
-          '.cm-content': {
-            padding: '16px 0',
-            caretColor: '#e8c07d',
-          },
-          '.cm-gutters': {
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: '#5c6575',
-            minWidth: '40px',
-          },
-          '.cm-activeLine': {
-            backgroundColor: 'rgba(232, 192, 125, 0.06)',
-          },
-          '.cm-activeLineGutter': {
-            backgroundColor: 'transparent',
-            color: '#e8c07d',
-          },
-          '&.cm-focused .cm-cursor': {
-            borderLeftColor: '#e8c07d',
-          },
-          '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-            backgroundColor: 'rgba(106, 156, 196, 0.35)',
-          },
-        }),
+        themeCompartment.current.of(editorThemeExtensions(theme)),
       ],
     })
 
@@ -147,6 +117,14 @@ export function MarkdownEditor({
       })
     }
   }, [value])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: themeCompartment.current.reconfigure(editorThemeExtensions(theme)),
+    })
+  }, [theme])
 
   const withView = (fn: (view: EditorView) => void) => {
     const view = viewRef.current

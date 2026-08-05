@@ -23,7 +23,7 @@ type NamePrompt =
   | { kind: 'rename'; entry: FileEntry }
 
 export default function App() {
-  const { preference: theme, setPreference: setTheme } = useTheme()
+  const { preference: theme, resolved: resolvedTheme, setPreference: setTheme } = useTheme()
   const [rootPath, setRootPath] = useState<string | null>(null)
   const [tree, setTree] = useState<FileEntry[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
@@ -339,6 +339,7 @@ export default function App() {
                   <MarkdownEditor
                     key={activePath}
                     value={content}
+                    theme={resolvedTheme}
                     onChange={handleContentChange}
                     onPasteImage={handlePasteImage}
                     onMessage={setStatus}
