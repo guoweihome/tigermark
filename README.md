@@ -24,11 +24,7 @@
 
 ## 截图
 
-> 建议在此补充应用截图（编辑 / 分屏预览 / 粘贴图片等）。可将图片放在 `docs/screenshots/` 后引用：
->
-> ```markdown
-> ![分屏编辑](docs/screenshots/split.png)
-> ```
+![TigerMark 暗色模式分屏编辑](docs/screen_shot.png)
 
 ---
 
