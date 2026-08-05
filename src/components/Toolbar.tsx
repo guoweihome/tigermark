@@ -1,24 +1,35 @@
 import type { ViewMode } from '../vite-env'
+import type { ThemePreference } from '../theme'
 
 interface ToolbarProps {
   fileName: string | null
   dirty: boolean
   viewMode: ViewMode
+  theme: ThemePreference
   canSave: boolean
   onOpenFolder: () => void
   onSave: () => void
   onViewModeChange: (mode: ViewMode) => void
+  onThemeChange: (theme: ThemePreference) => void
   onNewFile: () => void
 }
+
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '暗色' },
+  { value: 'system', label: '系统' },
+]
 
 export function Toolbar({
   fileName,
   dirty,
   viewMode,
+  theme,
   canSave,
   onOpenFolder,
   onSave,
   onViewModeChange,
+  onThemeChange,
   onNewFile,
 }: ToolbarProps) {
   return (
@@ -68,6 +79,20 @@ export function Toolbar({
               type="button"
               className={viewMode === mode ? 'active' : ''}
               onClick={() => onViewModeChange(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="view-toggle" role="group" aria-label="主题">
+          {THEME_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={theme === value ? 'active' : ''}
+              onClick={() => onThemeChange(value)}
+              title={label}
             >
               {label}
             </button>

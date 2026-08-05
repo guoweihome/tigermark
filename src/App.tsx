@@ -5,6 +5,7 @@ import { MarkdownEditor } from './components/MarkdownEditor'
 import { MarkdownPreview } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
 import { Toolbar } from './components/Toolbar'
+import { useTheme } from './theme'
 
 function basename(filePath: string) {
   return filePath.split(/[/\\]/).pop() ?? filePath
@@ -22,6 +23,7 @@ type NamePrompt =
   | { kind: 'rename'; entry: FileEntry }
 
 export default function App() {
+  const { preference: theme, setPreference: setTheme } = useTheme()
   const [rootPath, setRootPath] = useState<string | null>(null)
   const [tree, setTree] = useState<FileEntry[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
@@ -254,10 +256,12 @@ export default function App() {
         fileName={activePath ? basename(activePath) : null}
         dirty={dirty}
         viewMode={viewMode}
+        theme={theme}
         canSave={Boolean(activePath)}
         onOpenFolder={openDirectory}
         onSave={() => void saveFile()}
         onViewModeChange={setViewMode}
+        onThemeChange={setTheme}
         onNewFile={() => {
           if (!rootPath) {
             setStatus('请先打开文件夹')
