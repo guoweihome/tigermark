@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry, ViewMode } from './vite-env'
 import { FileTree } from './components/FileTree'
 import { MarkdownEditor } from './components/MarkdownEditor'
 import { MarkdownPreview } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
 import { Toolbar } from './components/Toolbar'
+import { clearSession, readSession, writeSession } from './session'
 import { useTheme } from './theme'
+
+function topLevelDirPaths(entries: FileEntry[]): string[] {
+  return entries.filter((e) => e.isDirectory).map((e) => e.path)
+}
 
 function basename(filePath: string) {
   return filePath.split(/[/\\]/).pop() ?? filePath
@@ -15,6 +20,24 @@ function dirname(filePath: string) {
   const normalized = filePath.replace(/\\/g, '/')
   const index = normalized.lastIndexOf('/')
   return index === -1 ? normalized : normalized.slice(0, index)
+}
+
+function filterTree(entries: FileEntry[], query: string): FileEntry[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return entries
+
+  const result: FileEntry[] = []
+  for (const entry of entries) {
+    if (entry.isDirectory) {
+      const children = filterTree(entry.children ?? [], q)
+      if (children.length > 0 || entry.name.toLowerCase().includes(q)) {
+        result.push({ ...entry, children })
+      }
+    } else if (entry.name.toLowerCase().includes(q)) {
+      result.push(entry)
+    }
+  }
+  return result
 }
 
 type NamePrompt =
@@ -32,24 +55,72 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [status, setStatus] = useState('打开一个文件夹开始编辑')
   const [sidebarWidth, setSidebarWidth] = useState(260)
+  const [fileQuery, setFileQuery] = useState('')
   const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null)
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
   const savingRef = useRef(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef(content)
   const activePathRef = useRef(activePath)
   const dirtyRef = useRef(dirty)
+  const rootPathRef = useRef(rootPath)
+  const expandedPathsRef = useRef(expandedPaths)
+  const sessionReadyRef = useRef(false)
 
   contentRef.current = content
   activePathRef.current = activePath
   dirtyRef.current = dirty
+  rootPathRef.current = rootPath
+  expandedPathsRef.current = expandedPaths
+
+  const filteredTree = useMemo(() => filterTree(tree, fileQuery), [tree, fileQuery])
+  const hasFilter = fileQuery.trim().length > 0
+
+  const persistSession = useCallback(
+    (next?: {
+      rootPath?: string | null
+      expandedPaths?: Set<string>
+      activePath?: string | null
+    }) => {
+      const root = next?.rootPath !== undefined ? next.rootPath : rootPathRef.current
+      if (!root) {
+        clearSession()
+        return
+      }
+      writeSession({
+        rootPath: root,
+        expandedPaths: [
+          ...(next?.expandedPaths ?? expandedPathsRef.current),
+        ],
+        activePath:
+          next?.activePath !== undefined ? next.activePath : activePathRef.current,
+      })
+    },
+    [],
+  )
 
   const refreshTree = useCallback(async (dir: string) => {
     const result = await window.tigermark.readDirectory(dir)
     if (!result.ok || !result.data) {
       setStatus(result.error ?? '读取目录失败')
-      return
+      return null
     }
     setTree(result.data)
+    return result.data
   }, [])
+
+  const toggleExpand = useCallback(
+    (dirPath: string) => {
+      setExpandedPaths((prev) => {
+        const next = new Set(prev)
+        if (next.has(dirPath)) next.delete(dirPath)
+        else next.add(dirPath)
+        persistSession({ expandedPaths: next })
+        return next
+      })
+    },
+    [persistSession],
+  )
 
   const openDirectory = useCallback(async () => {
     if (dirtyRef.current) {
@@ -62,29 +133,41 @@ export default function App() {
       return
     }
     if (!result.data) return
+    const entries = await refreshTree(result.data)
+    const nextExpanded = new Set(entries ? topLevelDirPaths(entries) : [])
     setRootPath(result.data)
     setActivePath(null)
     setContent('')
     setDirty(false)
-    await refreshTree(result.data)
+    setFileQuery('')
+    setExpandedPaths(nextExpanded)
+    persistSession({
+      rootPath: result.data,
+      expandedPaths: nextExpanded,
+      activePath: null,
+    })
     setStatus(`已打开：${result.data}`)
-  }, [refreshTree])
+  }, [persistSession, refreshTree])
 
-  const openFile = useCallback(async (filePath: string) => {
-    if (dirtyRef.current && activePathRef.current !== filePath) {
-      const leave = window.confirm('当前文件尚未保存，确定切换？')
-      if (!leave) return
-    }
-    const result = await window.tigermark.readFile(filePath)
-    if (!result.ok || result.data === undefined) {
-      setStatus(result.error ?? '读取文件失败')
-      return
-    }
-    setActivePath(filePath)
-    setContent(result.data)
-    setDirty(false)
-    setStatus(filePath)
-  }, [])
+  const openFile = useCallback(
+    async (filePath: string) => {
+      if (dirtyRef.current && activePathRef.current !== filePath) {
+        const leave = window.confirm('当前文件尚未保存，确定切换？')
+        if (!leave) return
+      }
+      const result = await window.tigermark.readFile(filePath)
+      if (!result.ok || result.data === undefined) {
+        setStatus(result.error ?? '读取文件失败')
+        return
+      }
+      setActivePath(filePath)
+      setContent(result.data)
+      setDirty(false)
+      setStatus(filePath)
+      persistSession({ activePath: filePath })
+    },
+    [persistSession],
+  )
 
   const saveFile = useCallback(async () => {
     const path = activePathRef.current
@@ -152,15 +235,31 @@ export default function App() {
         setStatus(result.error ?? '删除失败')
         return
       }
-      if (activePathRef.current === entry.path || activePathRef.current?.startsWith(entry.path + '/')) {
+      const closedActive =
+        activePathRef.current === entry.path ||
+        activePathRef.current?.startsWith(entry.path + '/') ||
+        activePathRef.current?.startsWith(entry.path + '\\')
+      if (closedActive) {
         setActivePath(null)
         setContent('')
         setDirty(false)
       }
+      setExpandedPaths((prev) => {
+        const next = new Set(
+          [...prev].filter(
+            (p) => p !== entry.path && !p.startsWith(entry.path + '/') && !p.startsWith(entry.path + '\\'),
+          ),
+        )
+        persistSession({
+          expandedPaths: next,
+          activePath: closedActive ? null : activePathRef.current,
+        })
+        return next
+      })
       if (rootPath) await refreshTree(rootPath)
       setStatus(`已删除 ${entry.name}`)
     },
-    [refreshTree, rootPath],
+    [persistSession, refreshTree, rootPath],
   )
 
   const handleNameConfirm = useCallback(
@@ -173,6 +272,12 @@ export default function App() {
           setStatus(result.error ?? '创建文件失败')
           return
         }
+        setExpandedPaths((prev) => {
+          const next = new Set(prev)
+          next.add(prompt.dirPath)
+          persistSession({ expandedPaths: next })
+          return next
+        })
         if (rootPath) await refreshTree(rootPath)
         await openFile(result.data)
         return
@@ -184,25 +289,97 @@ export default function App() {
           setStatus(result.error ?? '创建文件夹失败')
           return
         }
+        setExpandedPaths((prev) => {
+          const next = new Set(prev)
+          next.add(prompt.dirPath)
+          persistSession({ expandedPaths: next })
+          return next
+        })
         if (rootPath) await refreshTree(rootPath)
         setStatus(`已创建文件夹 ${name}`)
         return
       }
 
       if (name === prompt.entry.name) return
-      const result = await window.tigermark.renamePath(prompt.entry.path, name)
+      const oldPath = prompt.entry.path
+      const result = await window.tigermark.renamePath(oldPath, name)
       if (!result.ok || !result.data) {
         setStatus(result.error ?? '重命名失败')
         return
       }
-      if (activePathRef.current === prompt.entry.path) {
-        setActivePath(result.data)
+      const newPath = result.data
+
+      let nextExpanded = expandedPathsRef.current
+      if (prompt.entry.isDirectory) {
+        nextExpanded = new Set<string>()
+        for (const p of expandedPathsRef.current) {
+          if (p === oldPath) nextExpanded.add(newPath)
+          else if (p.startsWith(oldPath + '/') || p.startsWith(oldPath + '\\')) {
+            nextExpanded.add(newPath + p.slice(oldPath.length))
+          } else {
+            nextExpanded.add(p)
+          }
+        }
+        setExpandedPaths(nextExpanded)
       }
+
+      let nextActive = activePathRef.current
+      if (activePathRef.current === oldPath) {
+        nextActive = newPath
+        setActivePath(newPath)
+      } else if (
+        activePathRef.current?.startsWith(oldPath + '/') ||
+        activePathRef.current?.startsWith(oldPath + '\\')
+      ) {
+        nextActive = newPath + activePathRef.current.slice(oldPath.length)
+        setActivePath(nextActive)
+      }
+
+      persistSession({
+        expandedPaths: nextExpanded,
+        activePath: nextActive,
+      })
       if (rootPath) await refreshTree(rootPath)
       setStatus(`已重命名为 ${name}`)
     },
-    [openFile, refreshTree, rootPath],
+    [openFile, persistSession, refreshTree, rootPath],
   )
+
+  useEffect(() => {
+    if (sessionReadyRef.current) return
+    sessionReadyRef.current = true
+
+    const session = readSession()
+    if (!session) return
+
+    void (async () => {
+      const entries = await refreshTree(session.rootPath)
+      if (!entries) {
+        clearSession()
+        setStatus('上次打开的目录已失效，请重新选择')
+        return
+      }
+      setRootPath(session.rootPath)
+      setExpandedPaths(new Set(session.expandedPaths))
+      setStatus(`已打开：${session.rootPath}`)
+
+      if (session.activePath) {
+        const result = await window.tigermark.readFile(session.activePath)
+        if (result.ok && result.data !== undefined) {
+          setActivePath(session.activePath)
+          setContent(result.data)
+          setDirty(false)
+          setStatus(session.activePath)
+        } else {
+          persistSession({
+            rootPath: session.rootPath,
+            expandedPaths: new Set(session.expandedPaths),
+            activePath: null,
+          })
+        }
+      }
+    })()
+  }, [persistSession, refreshTree])
 
   useEffect(() => {
     if (!window.tigermark?.onMenuOpenDirectory) return
@@ -225,6 +402,11 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         void saveFile()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -307,17 +489,44 @@ export default function App() {
             </div>
           </div>
 
+          {rootPath && (
+            <div className="sidebar-search">
+              <input
+                ref={searchInputRef}
+                className="sidebar-search-input"
+                type="search"
+                value={fileQuery}
+                placeholder="搜索文件… ⌘P"
+                aria-label="搜索文件"
+                onChange={(e) => setFileQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    if (fileQuery) setFileQuery('')
+                    else e.currentTarget.blur()
+                  }
+                }}
+              />
+            </div>
+          )}
+
           <div className="sidebar-body">
             {rootPath ? (
-              <FileTree
-                entries={tree}
-                activePath={activePath}
-                onOpenFile={openFile}
-                onCreateFile={createFile}
-                onCreateFolder={createFolder}
-                onDelete={deleteEntry}
-                onRename={renameEntry}
-              />
+              hasFilter && filteredTree.length === 0 ? (
+                <div className="sidebar-empty-filter">未找到匹配文件</div>
+              ) : (
+                <FileTree
+                  entries={filteredTree}
+                  activePath={activePath}
+                  onOpenFile={openFile}
+                  onCreateFile={createFile}
+                  onCreateFolder={createFolder}
+                  onDelete={deleteEntry}
+                  onRename={renameEntry}
+                  expandedPaths={expandedPaths}
+                  onToggleExpand={toggleExpand}
+                  expandAll={hasFilter}
+                />
+              )
             ) : (
               <div className="empty-sidebar">
                 <p>打开本地文件夹</p>
@@ -358,7 +567,7 @@ export default function App() {
               <h1>TigerMark</h1>
               <p>左侧打开目录，选择 Markdown 文件开始写作</p>
               <div className="hint-row">
-                <kbd>⌘/Ctrl</kbd>+<kbd>O</kbd> 打开文件夹
+                <kbd>⌘/Ctrl</kbd>+<kbd>P</kbd> 搜索文件
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>S</kbd> 保存
                 <span>·</span>

@@ -9,6 +9,9 @@ interface FileTreeProps {
   onCreateFolder: (dirPath: string) => void
   onDelete: (entry: FileEntry) => void
   onRename: (entry: FileEntry) => void
+  expandedPaths: Set<string>
+  onToggleExpand: (path: string) => void
+  expandAll?: boolean
   depth?: number
 }
 
@@ -30,11 +33,14 @@ function TreeNode({
   onCreateFolder,
   onDelete,
   onRename,
+  expandedPaths,
+  onToggleExpand,
+  expandAll = false,
   depth = 0,
 }: FileTreeProps & { entry: FileEntry }) {
-  const [expanded, setExpanded] = useState(depth < 1)
   const [menuOpen, setMenuOpen] = useState(false)
   const isActive = activePath === entry.path
+  const expanded = expandAll || expandedPaths.has(entry.path)
 
   if (entry.isDirectory) {
     return (
@@ -42,7 +48,7 @@ function TreeNode({
         <div
           className={`tree-row ${isActive ? 'active' : ''}`}
           style={{ paddingLeft: 10 + depth * 14 }}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => onToggleExpand(entry.path)}
           onContextMenu={(e) => {
             e.preventDefault()
             setMenuOpen(true)
@@ -89,6 +95,9 @@ function TreeNode({
                 onCreateFolder={onCreateFolder}
                 onDelete={onDelete}
                 onRename={onRename}
+                expandedPaths={expandedPaths}
+                onToggleExpand={onToggleExpand}
+                expandAll={expandAll}
                 depth={depth + 1}
               />
             ))}
