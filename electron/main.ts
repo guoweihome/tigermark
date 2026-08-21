@@ -58,8 +58,8 @@ function resolveAppIcon() {
         ? ['icon.ico', 'icon.png']
         : ['icon.png']
 
-  for (const root of roots) {
-    for (const name of names) {
+  for (const name of names) {
+    for (const root of roots) {
       const candidate = path.resolve(root, name)
       if (existsSync(candidate)) return candidate
     }
