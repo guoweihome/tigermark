@@ -9,6 +9,7 @@ import {
   protocol,
   shell,
 } from 'electron'
+import { setupAutoUpdater, checkForUpdates } from './updater'
 import fs from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
@@ -253,6 +254,12 @@ function buildMenu() {
           label: '官网',
           click: () => {
             void shell.openExternal(SITE_URL)
+          },
+        },
+        {
+          label: '检查更新…',
+          click: () => {
+            void checkForUpdates(true)
           },
         },
       ],
@@ -587,6 +594,7 @@ app.whenReady().then(() => {
   configureAboutPanel()
   buildMenu()
   createWindow()
+  setupAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
