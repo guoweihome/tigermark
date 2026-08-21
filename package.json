@@ -16,21 +16,26 @@
     "appId": "com.tigermark.app",
     "productName": "TigerMark",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "icon": "build/icon.png",
     "mac": {
       "target": ["dmg", "zip"],
+      "icon": "build/icon.png",
       "category": "public.app-category.productivity"
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": ["nsis", "portable"],
+      "icon": "build/icon.png"
     },
     "linux": {
       "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
       "category": "Office"
     }
   },

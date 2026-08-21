@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry, ViewMode } from './vite-env'
+import { ConfirmLeaveDialog } from './components/ConfirmLeaveDialog'
 import { FileTree } from './components/FileTree'
 import { MarkdownEditor } from './components/MarkdownEditor'
 import { MarkdownPreview } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
 import { Toolbar } from './components/Toolbar'
+import { cssFontFamily, DEFAULT_FONT, revealInFolderLabel } from './fonts'
 import { clearSession, readSession, writeSession } from './session'
 import { useTheme } from './theme'
 
@@ -20,6 +22,32 @@ function dirname(filePath: string) {
   const normalized = filePath.replace(/\\/g, '/')
   const index = normalized.lastIndexOf('/')
   return index === -1 ? normalized : normalized.slice(0, index)
+}
+
+function IconOpenFolder() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M1.75 2.5A1.75 1.75 0 0 0 0 4.25v7.5A1.75 1.75 0 0 0 1.75 13.5h12.5A1.75 1.75 0 0 0 16 11.75v-6A1.75 1.75 0 0 0 14.25 4H8.06l-.72-1.08A1.75 1.75 0 0 0 5.9 2.5H1.75z" />
+    </svg>
+  )
+}
+
+function IconNewFile() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M2.75 1.5A1.75 1.75 0 0 0 1 3.25v9.5c0 .966.784 1.75 1.75 1.75h5.5a.75.75 0 0 0 0-1.5h-5.5a.25.25 0 0 1-.25-.25V3.25a.25.25 0 0 1 .25-.25H8.5v2.5c0 .69.56 1.25 1.25 1.25h2.75v5.25a.25.25 0 0 1-.25.25h-.5a.75.75 0 0 0 0 1.5h.5A1.75 1.75 0 0 0 14 12.75V6.06c0-.464-.184-.91-.513-1.237L10.677 1.513A1.75 1.75 0 0 0 9.44 1H2.75zM10 2.56 12.44 5H10V2.56z" />
+      <path d="M12.75 10a.75.75 0 0 1 .75.75V12.5h1.75a.75.75 0 0 1 0 1.5H13.5v1.75a.75.75 0 0 1-1.5 0V14H10.25a.75.75 0 0 1 0-1.5H12v-1.75a.75.75 0 0 1 .75-.75z" />
+    </svg>
+  )
+}
+
+function IconNewFolder() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M1.75 2.5A1.75 1.75 0 0 0 0 4.25v7.5A1.75 1.75 0 0 0 1.75 13.5h6.5a.75.75 0 0 0 0-1.5h-6.5a.25.25 0 0 1-.25-.25v-7.5a.25.25 0 0 1 .25-.25h4.15c.192 0 .377.075.513.21l.97.97h3.67a.25.25 0 0 1 .25.25v.25a.75.75 0 0 0 1.5 0v-.25A1.75 1.75 0 0 0 11.3 4H7.06L6.34 2.92A1.75 1.75 0 0 0 5.9 2.5H1.75z" />
+      <path d="M12.75 8.25a.75.75 0 0 1 .75.75v1.75h1.75a.75.75 0 0 1 0 1.5H13.5v1.75a.75.75 0 0 1-1.5 0V12.25H10.25a.75.75 0 0 1 0-1.5H12V9a.75.75 0 0 1 .75-.75z" />
+    </svg>
+  )
 }
 
 function filterTree(entries: FileEntry[], query: string): FileEntry[] {
@@ -45,6 +73,48 @@ type NamePrompt =
   | { kind: 'createFolder'; dirPath: string }
   | { kind: 'rename'; entry: FileEntry }
 
+const UI_STORAGE_KEY = 'tigermark.ui'
+const SIDEBAR_MIN = 180
+const SIDEBAR_MAX = 480
+const SIDEBAR_COLLAPSE = 120
+const SPLIT_MIN = 0.22
+const SPLIT_MAX = 0.78
+
+function readUiPrefs() {
+  try {
+    const raw = localStorage.getItem(UI_STORAGE_KEY)
+    if (!raw) {
+      return { sidebarWidth: 260, sidebarOpen: true, splitRatio: 0.5, fontFamily: DEFAULT_FONT }
+    }
+    const parsed = JSON.parse(raw) as {
+      sidebarWidth?: unknown
+      sidebarOpen?: unknown
+      splitRatio?: unknown
+      fontFamily?: unknown
+    }
+    const width =
+      typeof parsed.sidebarWidth === 'number'
+        ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, parsed.sidebarWidth))
+        : 260
+    const splitRatio =
+      typeof parsed.splitRatio === 'number'
+        ? Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, parsed.splitRatio))
+        : 0.5
+    const fontFamily =
+      typeof parsed.fontFamily === 'string' && parsed.fontFamily.trim()
+        ? parsed.fontFamily
+        : DEFAULT_FONT
+    return {
+      sidebarWidth: width,
+      sidebarOpen: parsed.sidebarOpen !== false,
+      splitRatio,
+      fontFamily,
+    }
+  } catch {
+    return { sidebarWidth: 260, sidebarOpen: true, splitRatio: 0.5, fontFamily: DEFAULT_FONT }
+  }
+}
+
 export default function App() {
   const { preference: theme, resolved: resolvedTheme, setPreference: setTheme } = useTheme()
   const [rootPath, setRootPath] = useState<string | null>(null)
@@ -53,8 +123,14 @@ export default function App() {
   const [content, setContent] = useState('')
   const [dirty, setDirty] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('split')
-  const [status, setStatus] = useState('打开一个文件夹开始编辑')
-  const [sidebarWidth, setSidebarWidth] = useState(260)
+  const [, setStatus] = useState('打开一个文件夹开始编辑')
+  const [sidebarWidth, setSidebarWidth] = useState(() => readUiPrefs().sidebarWidth)
+  const [sidebarOpen, setSidebarOpen] = useState(() => readUiPrefs().sidebarOpen)
+  const [sidebarPeeking, setSidebarPeeking] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
+  const [splitRatio, setSplitRatio] = useState(() => readUiPrefs().splitRatio)
+  const [isSplitResizing, setIsSplitResizing] = useState(false)
+  const [fontFamily, setFontFamily] = useState(() => readUiPrefs().fontFamily)
   const [fileQuery, setFileQuery] = useState('')
   const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null)
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
@@ -66,15 +142,67 @@ export default function App() {
   const rootPathRef = useRef(rootPath)
   const expandedPathsRef = useRef(expandedPaths)
   const sessionReadyRef = useRef(false)
+  const lastSidebarWidthRef = useRef(sidebarWidth)
+  const lastToggleAtRef = useRef(0)
+  const peekTimerRef = useRef<number | null>(null)
+  const sidebarOpenRef = useRef(sidebarOpen)
+  const panesRef = useRef<HTMLDivElement>(null)
+  const leaveResolverRef = useRef<((choice: 'save' | 'discard' | 'cancel') => void) | null>(
+    null,
+  )
+  const confirmUnsavedRef = useRef<() => Promise<boolean>>(async () => true)
+  const [leavePrompt, setLeavePrompt] = useState(false)
+  const isMac = window.tigermark?.platform === 'darwin'
 
   contentRef.current = content
   activePathRef.current = activePath
   dirtyRef.current = dirty
   rootPathRef.current = rootPath
   expandedPathsRef.current = expandedPaths
+  sidebarOpenRef.current = sidebarOpen
 
   const filteredTree = useMemo(() => filterTree(tree, fileQuery), [tree, fileQuery])
   const hasFilter = fileQuery.trim().length > 0
+
+  useEffect(() => {
+    localStorage.setItem(
+      UI_STORAGE_KEY,
+      JSON.stringify({ sidebarWidth, sidebarOpen, splitRatio, fontFamily }),
+    )
+  }, [sidebarWidth, sidebarOpen, splitRatio, fontFamily])
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-content', cssFontFamily(fontFamily))
+  }, [fontFamily])
+
+  const clearPeekTimer = () => {
+    if (peekTimerRef.current !== null) {
+      window.clearTimeout(peekTimerRef.current)
+      peekTimerRef.current = null
+    }
+  }
+
+  const toggleSidebar = useCallback(() => {
+    const now = Date.now()
+    if (now - lastToggleAtRef.current < 80) return
+    lastToggleAtRef.current = now
+    clearPeekTimer()
+    setSidebarPeeking(false)
+    setSidebarOpen((open) => !open)
+    if (!sidebarOpenRef.current) {
+      setSidebarWidth(lastSidebarWidthRef.current)
+    }
+  }, [])
+
+  const focusFileSearch = useCallback(() => {
+    clearPeekTimer()
+    setSidebarPeeking(false)
+    setSidebarOpen(true)
+    window.setTimeout(() => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }, 60)
+  }, [])
 
   const persistSession = useCallback(
     (next?: {
@@ -123,10 +251,7 @@ export default function App() {
   )
 
   const openDirectory = useCallback(async () => {
-    if (dirtyRef.current) {
-      const leave = window.confirm('当前文件尚未保存，确定继续？')
-      if (!leave) return
-    }
+    if (!(await confirmUnsavedRef.current())) return
     const result = await window.tigermark.openDirectory()
     if (!result.ok) {
       setStatus(result.error ?? '打开目录失败')
@@ -150,10 +275,13 @@ export default function App() {
   }, [persistSession, refreshTree])
 
   const openFile = useCallback(
-    async (filePath: string) => {
-      if (dirtyRef.current && activePathRef.current !== filePath) {
-        const leave = window.confirm('当前文件尚未保存，确定切换？')
-        if (!leave) return
+    async (filePath: string, options?: { skipUnsavedCheck?: boolean }) => {
+      if (
+        !options?.skipUnsavedCheck &&
+        dirtyRef.current &&
+        activePathRef.current !== filePath
+      ) {
+        if (!(await confirmUnsavedRef.current())) return
       }
       const result = await window.tigermark.readFile(filePath)
       if (!result.ok || result.data === undefined) {
@@ -165,26 +293,48 @@ export default function App() {
       setDirty(false)
       setStatus(filePath)
       persistSession({ activePath: filePath })
+      if (!sidebarOpenRef.current) setSidebarPeeking(false)
     },
     [persistSession],
   )
 
   const saveFile = useCallback(async () => {
     const path = activePathRef.current
-    if (!path || savingRef.current) return
+    if (!path || savingRef.current) return false
     savingRef.current = true
     try {
       const result = await window.tigermark.writeFile(path, contentRef.current)
       if (!result.ok) {
         setStatus(result.error ?? '保存失败')
-        return
+        return false
       }
       setDirty(false)
       setStatus(`已保存 · ${basename(path)}`)
+      return true
     } finally {
       savingRef.current = false
     }
   }, [])
+
+  const confirmUnsaved = useCallback(async () => {
+    if (!dirtyRef.current) return true
+    if (leaveResolverRef.current) return false
+    const choice = await new Promise<'save' | 'discard' | 'cancel'>((resolve) => {
+      leaveResolverRef.current = resolve
+      setLeavePrompt(true)
+    })
+    if (choice === 'cancel') return false
+    if (choice === 'save') return saveFile()
+    return true
+  }, [saveFile])
+  confirmUnsavedRef.current = confirmUnsaved
+
+  const resolveLeave = (choice: 'save' | 'discard' | 'cancel') => {
+    setLeavePrompt(false)
+    const resolve = leaveResolverRef.current
+    leaveResolverRef.current = null
+    resolve?.(choice)
+  }
 
   const handleContentChange = useCallback((value: string) => {
     setContent(value)
@@ -262,11 +412,19 @@ export default function App() {
     [persistSession, refreshTree, rootPath],
   )
 
+  const revealInFolder = useCallback(async (entry: FileEntry) => {
+    const result = await window.tigermark.showItemInFolder(entry.path)
+    if (!result.ok) {
+      setStatus(result.error ?? '无法打开所在位置')
+    }
+  }, [])
+
   const handleNameConfirm = useCallback(
     async (prompt: NamePrompt, name: string) => {
       setNamePrompt(null)
 
       if (prompt.kind === 'createFile') {
+        if (!(await confirmUnsavedRef.current())) return
         const result = await window.tigermark.createFile(prompt.dirPath, name)
         if (!result.ok || !result.data) {
           setStatus(result.error ?? '创建文件失败')
@@ -279,7 +437,7 @@ export default function App() {
           return next
         })
         if (rootPath) await refreshTree(rootPath)
-        await openFile(result.data)
+        await openFile(result.data, { skipUnsavedCheck: true })
         return
       }
 
@@ -390,12 +548,39 @@ export default function App() {
         setViewMode(mode)
       }
     })
+    const offSidebar = window.tigermark.onMenuToggleSidebar?.(toggleSidebar)
     return () => {
       offOpen()
       offSave()
       offView()
+      offSidebar?.()
     }
-  }, [openDirectory, saveFile])
+  }, [openDirectory, saveFile, toggleSidebar])
+
+  useEffect(() => {
+    const onCloseRequest = () => {
+      void (async () => {
+        const ok = await confirmUnsavedRef.current()
+        if (ok) window.tigermark.allowClose()
+        else window.tigermark.denyClose()
+      })()
+    }
+    const offClose = window.tigermark?.onCloseRequest?.(onCloseRequest)
+
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    if (!window.tigermark?.onCloseRequest) {
+      window.addEventListener('beforeunload', onBeforeUnload)
+    }
+
+    return () => {
+      offClose?.()
+      window.removeEventListener('beforeunload', onBeforeUnload)
+    }
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -405,23 +590,39 @@ export default function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault()
-        searchInputRef.current?.focus()
-        searchInputRef.current?.select()
+        focusFileSearch()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        toggleSidebar()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [saveFile])
+  }, [saveFile, focusFileSearch, toggleSidebar])
 
   const onResizeStart = (e: { preventDefault(): void; clientX: number }) => {
     e.preventDefault()
     const startX = e.clientX
     const startWidth = sidebarWidth
+    setIsResizing(true)
+    setSidebarPeeking(false)
     const onMove = (ev: MouseEvent) => {
-      const next = Math.min(480, Math.max(180, startWidth + ev.clientX - startX))
-      setSidebarWidth(next)
+      const raw = startWidth + ev.clientX - startX
+      setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, raw)))
     }
-    const onUp = () => {
+    const onUp = (ev: MouseEvent) => {
+      const raw = startWidth + ev.clientX - startX
+      setIsResizing(false)
+      if (raw < SIDEBAR_COLLAPSE) {
+        lastSidebarWidthRef.current = startWidth
+        setSidebarWidth(startWidth)
+        setSidebarOpen(false)
+      } else {
+        const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, raw))
+        lastSidebarWidthRef.current = next
+        setSidebarWidth(next)
+      }
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
@@ -429,17 +630,66 @@ export default function App() {
     window.addEventListener('mouseup', onUp)
   }
 
+  const onSplitResizeStart = (e: { preventDefault(): void }) => {
+    e.preventDefault()
+    if (!panesRef.current) return
+    setIsSplitResizing(true)
+    const onMove = (ev: MouseEvent) => {
+      const box = panesRef.current?.getBoundingClientRect()
+      if (!box || box.width <= 0) return
+      const next = (ev.clientX - box.left) / box.width
+      setSplitRatio(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, next)))
+    }
+    const onUp = () => {
+      setIsSplitResizing(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const onSidebarEnter = () => {
+    if (sidebarOpen) return
+    clearPeekTimer()
+    setSidebarPeeking(true)
+  }
+
+  const onSidebarLeave = () => {
+    if (sidebarOpen) return
+    clearPeekTimer()
+    peekTimerRef.current = window.setTimeout(() => {
+      setSidebarPeeking(false)
+      peekTimerRef.current = null
+    }, 280)
+  }
+
+  const sidebarVisible = sidebarOpen || sidebarPeeking
   const showEditor = viewMode === 'edit' || viewMode === 'split'
   const showPreview = viewMode === 'preview' || viewMode === 'split'
 
   return (
-    <div className="app">
+    <div className={`app${isMac ? ' is-mac' : ''}`}>
+      <div className="dew-layer" aria-hidden="true">
+        <span className="dew-drop d1" />
+        <span className="dew-drop d2" />
+        <span className="dew-drop d3" />
+        <span className="dew-drop d4" />
+        <span className="dew-drop d5" />
+        <span className="dew-drop d6" />
+        <span className="dew-drop d7" />
+        <span className="dew-drop d8" />
+      </div>
       <Toolbar
+        isMac={isMac}
         fileName={activePath ? basename(activePath) : null}
+        folderName={rootPath ? basename(rootPath) : null}
         dirty={dirty}
         viewMode={viewMode}
         theme={theme}
         canSave={Boolean(activePath)}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={toggleSidebar}
         onOpenFolder={openDirectory}
         onSave={() => void saveFile()}
         onViewModeChange={setViewMode}
@@ -451,43 +701,67 @@ export default function App() {
           }
           void createFile(rootPath)
         }}
+        onCommandCenter={() => {
+          if (!rootPath) {
+            void openDirectory()
+            return
+          }
+          focusFileSearch()
+        }}
+        fontFamily={fontFamily}
+        onFontChange={setFontFamily}
       />
 
-      <div className="workspace">
-        <aside className="sidebar" style={{ width: sidebarWidth }}>
-          <div className="sidebar-header">
-            <span className="sidebar-title">
-              {rootPath ? basename(rootPath) : '未打开目录'}
-            </span>
-            <div className="sidebar-actions">
-              <button
-                type="button"
-                className="icon-btn"
-                title="打开文件夹"
-                onClick={() => void openDirectory()}
-              >
-                📂
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                title="新建文件"
-                disabled={!rootPath}
-                onClick={() => rootPath && void createFile(rootPath)}
-              >
-                ＋
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                title="新建文件夹"
-                disabled={!rootPath}
-                onClick={() => rootPath && void createFolder(rootPath)}
-              >
-                ▣
-              </button>
+      <div className={`workspace${isResizing ? ' is-resizing' : ''}${sidebarOpen ? '' : ' sidebar-closed'}`}>
+        {!sidebarOpen && (
+          <div
+            className="sidebar-hotzone"
+            onMouseEnter={onSidebarEnter}
+          />
+        )}
+
+        <div
+          className={`sidebar-shell${sidebarOpen ? '' : sidebarPeeking ? ' is-overlay' : ' is-collapsed'}`}
+          onMouseEnter={onSidebarEnter}
+          onMouseLeave={onSidebarLeave}
+        >
+          <aside
+            className="sidebar"
+            style={{ width: sidebarVisible ? sidebarWidth : 0 }}
+          >
+            <div className="sidebar-header">
+              <span className="sidebar-title">
+                {rootPath ? basename(rootPath) : '未打开目录'}
+              </span>
+              <div className="sidebar-actions">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="打开文件夹"
+                  onClick={() => void openDirectory()}
+                >
+                  <IconOpenFolder />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="新建文件"
+                  disabled={!rootPath}
+                  onClick={() => rootPath && void createFile(rootPath)}
+                >
+                  <IconNewFile />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="新建文件夹"
+                  disabled={!rootPath}
+                  onClick={() => rootPath && void createFolder(rootPath)}
+                >
+                  <IconNewFolder />
+                </button>
+              </div>
             </div>
-          </div>
 
           {rootPath && (
             <div className="sidebar-search">
@@ -496,7 +770,7 @@ export default function App() {
                 className="sidebar-search-input"
                 type="search"
                 value={fileQuery}
-                placeholder="搜索文件… ⌘P"
+                placeholder={isMac ? '搜索文件… ⌘P' : '搜索文件… Ctrl+P'}
                 aria-label="搜索文件"
                 onChange={(e) => setFileQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -522,6 +796,8 @@ export default function App() {
                   onCreateFolder={createFolder}
                   onDelete={deleteEntry}
                   onRename={renameEntry}
+                  onReveal={(entry) => void revealInFolder(entry)}
+                  revealLabel={revealInFolderLabel(window.tigermark?.platform ?? '')}
                   expandedPaths={expandedPaths}
                   onToggleExpand={toggleExpand}
                   expandAll={hasFilter}
@@ -538,13 +814,40 @@ export default function App() {
           </div>
         </aside>
 
-        <div className="resizer" onMouseDown={onResizeStart} />
+        {sidebarVisible && (
+          <div
+            className={`resizer${isResizing ? ' is-resizing' : ''}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整侧栏宽度"
+            onMouseDown={onResizeStart}
+            onDoubleClick={toggleSidebar}
+          >
+            <span className="resizer-grip" aria-hidden="true" />
+          </div>
+        )}
+        </div>
 
-        <main className="editor-area">
+        <main
+          className="editor-area"
+          onMouseDown={() => {
+            if (!sidebarOpen) setSidebarPeeking(false)
+          }}
+        >
           {activePath ? (
-            <div className={`panes panes-${viewMode}`}>
+            <div
+              ref={panesRef}
+              className={`panes panes-${viewMode}${isSplitResizing ? ' is-resizing' : ''}`}
+            >
               {showEditor && (
-                <section className="pane editor-pane">
+                <section
+                  className="pane editor-pane"
+                  style={
+                    viewMode === 'split'
+                      ? { flex: `0 0 ${splitRatio * 100}%` }
+                      : undefined
+                  }
+                >
                   <MarkdownEditor
                     key={activePath}
                     value={content}
@@ -555,7 +858,18 @@ export default function App() {
                   />
                 </section>
               )}
-              {viewMode === 'split' && <div className="pane-divider" />}
+              {viewMode === 'split' && (
+                <div
+                  className={`resizer pane-resizer${isSplitResizing ? ' is-resizing' : ''}`}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="调整编辑与预览宽度"
+                  onMouseDown={onSplitResizeStart}
+                  onDoubleClick={() => setSplitRatio(0.5)}
+                >
+                  <span className="resizer-grip" aria-hidden="true" />
+                </div>
+              )}
               {showPreview && (
                 <section className="pane preview-pane">
                   <MarkdownPreview content={content} baseDir={dirname(activePath)} />
@@ -567,6 +881,8 @@ export default function App() {
               <h1>TigerMark</h1>
               <p>左侧打开目录，选择 Markdown 文件开始写作</p>
               <div className="hint-row">
+                <kbd>⌘/Ctrl</kbd>+<kbd>B</kbd> 侧边栏
+                <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>P</kbd> 搜索文件
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>S</kbd> 保存
@@ -577,11 +893,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      <footer className="status-bar">
-        <span>{status}</span>
-        <span>{dirty ? '未保存' : '已同步'}</span>
-      </footer>
 
       {namePrompt?.kind === 'createFile' && (
         <NameDialog
@@ -611,6 +922,14 @@ export default function App() {
           confirmLabel="重命名"
           onConfirm={(name) => void handleNameConfirm(namePrompt, name)}
           onCancel={() => setNamePrompt(null)}
+        />
+      )}
+      {leavePrompt && (
+        <ConfirmLeaveDialog
+          fileName={activePath ? basename(activePath) : '未命名文件'}
+          onSave={() => resolveLeave('save')}
+          onDiscard={() => resolveLeave('discard')}
+          onCancel={() => resolveLeave('cancel')}
         />
       )}
     </div>

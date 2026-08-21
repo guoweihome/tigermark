@@ -30,13 +30,12 @@ const darkEditorTheme = EditorView.theme(
   {
     '&': {
       height: '100%',
-      fontSize: '14.5px',
+      fontSize: '15px',
       color: '#eef1f6',
       backgroundColor: 'transparent',
     },
     '.cm-scroller': {
-      fontFamily:
-        '"JetBrains Mono", "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace',
+      fontFamily: 'var(--font-content)',
       lineHeight: '1.65',
     },
     '.cm-content': {
@@ -69,13 +68,12 @@ const darkEditorTheme = EditorView.theme(
 const lightEditorTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '14.5px',
-    color: '#1c2430',
+    fontSize: '15px',
+    color: '#12181f',
     backgroundColor: 'transparent',
   },
   '.cm-scroller': {
-    fontFamily:
-      '"JetBrains Mono", "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace',
+    fontFamily: 'var(--font-content)',
     lineHeight: '1.65',
   },
   '.cm-content': {
@@ -85,7 +83,7 @@ const lightEditorTheme = EditorView.theme({
   '.cm-gutters': {
     backgroundColor: 'transparent',
     border: 'none',
-    color: '#5c6575',
+    color: '#3a4452',
     minWidth: '40px',
   },
   '.cm-activeLine': {

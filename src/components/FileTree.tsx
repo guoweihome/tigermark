@@ -9,6 +9,8 @@ interface FileTreeProps {
   onCreateFolder: (dirPath: string) => void
   onDelete: (entry: FileEntry) => void
   onRename: (entry: FileEntry) => void
+  onReveal: (entry: FileEntry) => void
+  revealLabel: string
   expandedPaths: Set<string>
   onToggleExpand: (path: string) => void
   expandAll?: boolean
@@ -33,6 +35,8 @@ function TreeNode({
   onCreateFolder,
   onDelete,
   onRename,
+  onReveal,
+  revealLabel,
   expandedPaths,
   onToggleExpand,
   expandAll = false,
@@ -76,6 +80,7 @@ function TreeNode({
             actions={[
               { label: '新建文件', onClick: () => onCreateFile(entry.path) },
               { label: '新建文件夹', onClick: () => onCreateFolder(entry.path) },
+              { label: revealLabel, onClick: () => onReveal(entry) },
               { label: '重命名', onClick: () => onRename(entry) },
               { label: '删除', onClick: () => onDelete(entry), danger: true },
             ]}
@@ -95,6 +100,8 @@ function TreeNode({
                 onCreateFolder={onCreateFolder}
                 onDelete={onDelete}
                 onRename={onRename}
+                onReveal={onReveal}
+                revealLabel={revealLabel}
                 expandedPaths={expandedPaths}
                 onToggleExpand={onToggleExpand}
                 expandAll={expandAll}
@@ -138,6 +145,7 @@ function TreeNode({
         <ContextMenu
           onClose={() => setMenuOpen(false)}
           actions={[
+            { label: revealLabel, onClick: () => onReveal(entry) },
             { label: '重命名', onClick: () => onRename(entry) },
             { label: '删除', onClick: () => onDelete(entry), danger: true },
           ]}

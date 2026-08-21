@@ -4,6 +4,8 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
+  nativeTheme,
   protocol,
   shell,
 } from 'electron'
@@ -30,13 +32,50 @@ process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
   : path.join(__dirname, '../public')
 
+const SITE_URL = 'https://www.pytiger.com/'
 let mainWindow: BrowserWindow | null = null
+let allowClose = false
+let isQuitting = false
 
 const MARKDOWN_EXTS = new Set(['.md', '.markdown', '.mdown', '.mkd', '.txt'])
 /** Paste-image attachment dirs — keep out of the markdown file tree. */
 const HIDDEN_DIRS = new Set(['assets', 'node_modules', '.git'])
 
+function resolveAppIcon() {
+  const roots = [
+    process.env.VITE_PUBLIC,
+    path.join(__dirname, '../public'),
+    path.join(__dirname, '../build'),
+    path.join(process.cwd(), 'public'),
+    path.join(process.cwd(), 'build'),
+    process.resourcesPath,
+  ].filter((root): root is string => Boolean(root))
+
+  const names =
+    process.platform === 'darwin'
+      ? ['icon.icns', 'icon.png']
+      : process.platform === 'win32'
+        ? ['icon.ico', 'icon.png']
+        : ['icon.png']
+
+  for (const root of roots) {
+    for (const name of names) {
+      const candidate = path.resolve(root, name)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+  return undefined
+}
+
+function loadAppIcon() {
+  const iconPath = resolveAppIcon()
+  if (!iconPath) return undefined
+  const image = nativeImage.createFromPath(iconPath)
+  return image.isEmpty() ? undefined : image
+}
+
 function createWindow() {
+  allowClose = false
   const preloadCandidates = [
     path.join(__dirname, 'preload.js'),
     path.join(__dirname, 'preload.mjs'),
@@ -44,6 +83,8 @@ function createWindow() {
   const preload =
     preloadCandidates.find((candidate) => existsSync(candidate)) ??
     preloadCandidates[0]
+  const iconPath = resolveAppIcon()
+  const iconImage = loadAppIcon()
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -51,8 +92,22 @@ function createWindow() {
     minWidth: 900,
     minHeight: 560,
     title: 'TigerMark',
-    backgroundColor: '#eef1f4',
     show: false,
+    ...(iconPath ? { icon: iconPath } : {}),
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 16, y: 12 },
+          vibrancy: 'under-window' as const,
+          visualEffectState: 'active' as const,
+          backgroundColor: '#00000000',
+        }
+      : process.platform === 'win32'
+        ? {
+            backgroundMaterial: 'acrylic' as const,
+            backgroundColor: '#00000000',
+          }
+        : { backgroundColor: '#eef1f4' }),
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -60,6 +115,10 @@ function createWindow() {
       sandbox: false,
     },
   })
+
+  if (iconImage && process.platform === 'darwin') {
+    app.dock?.setIcon(iconImage)
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
@@ -75,6 +134,12 @@ function createWindow() {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+
+  mainWindow.on('close', (event) => {
+    if (allowClose) return
+    event.preventDefault()
+    mainWindow?.webContents.send('window:close-request')
+  })
 }
 
 function buildMenu() {
@@ -85,7 +150,18 @@ function buildMenu() {
           {
             label: app.name,
             submenu: [
-              { role: 'about' as const },
+              {
+                label: `关于 ${app.name}`,
+                click: () => {
+                  void showAbout()
+                },
+              },
+              {
+                label: '官网',
+                click: () => {
+                  void shell.openExternal(SITE_URL)
+                },
+              },
               { type: 'separator' as const },
               { role: 'services' as const },
               { type: 'separator' as const },
@@ -150,12 +226,67 @@ function buildMenu() {
           click: () => mainWindow?.webContents.send('menu:view-mode', 'preview'),
         },
         { type: 'separator' },
+        {
+          label: '切换侧边栏',
+          accelerator: 'CmdOrCtrl+B',
+          click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
+        },
+        { type: 'separator' },
         { role: 'toggleDevTools', label: '开发者工具' },
         { role: 'togglefullscreen', label: '全屏' },
       ],
     },
+    {
+      label: '帮助',
+      submenu: [
+        ...(!isMac
+          ? [
+              {
+                label: '关于 TigerMark',
+                click: () => {
+                  void showAbout()
+                },
+              },
+            ]
+          : []),
+        {
+          label: '官网',
+          click: () => {
+            void shell.openExternal(SITE_URL)
+          },
+        },
+      ],
+    },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+function configureAboutPanel() {
+  const iconPath = resolveAppIcon()
+  app.setAboutPanelOptions({
+    applicationName: 'TigerMark',
+    applicationVersion: app.getVersion(),
+    website: SITE_URL,
+    credits: SITE_URL,
+    ...(iconPath ? { iconPath } : {}),
+  })
+}
+
+async function showAbout() {
+  const icon = loadAppIcon()
+  const result = await dialog.showMessageBox({
+    title: '关于 TigerMark',
+    message: 'TigerMark',
+    detail: `版本 ${app.getVersion()}\n官网 ${SITE_URL}`,
+    ...(icon ? { icon } : { type: 'info' }),
+    buttons: ['打开官网', '关闭'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  })
+  if (result.response === 0) {
+    await shell.openExternal(SITE_URL)
+  }
 }
 
 async function readDirectoryTree(dirPath: string, depth = 0): Promise<FileNode[]> {
@@ -412,17 +543,61 @@ function registerIpc() {
       }
     },
   )
+
+  ipcMain.handle('shell:showItemInFolder', async (_event, targetPath: string) => {
+    try {
+      if (!existsSync(targetPath)) {
+        return fail(new Error('路径不存在'))
+      }
+      shell.showItemInFolder(targetPath)
+      return ok(undefined)
+    } catch (error) {
+      return fail(error)
+    }
+  })
 }
+
+function registerWindowCloseIpc() {
+  ipcMain.on('window:close-allow', () => {
+    allowClose = true
+    if (isQuitting) {
+      app.quit()
+      return
+    }
+    mainWindow?.close()
+  })
+
+  ipcMain.on('window:close-deny', () => {
+    isQuitting = false
+  })
+
+  ipcMain.handle('theme:set', (_event, theme: string) => {
+    if (theme === 'light' || theme === 'dark' || theme === 'system') {
+      nativeTheme.themeSource = theme
+    }
+  })
+}
+
+app.setName('TigerMark')
 
 app.whenReady().then(() => {
   registerFileProtocol()
   registerIpc()
+  registerWindowCloseIpc()
+  configureAboutPanel()
   buildMenu()
   createWindow()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      allowClose = false
+      createWindow()
+    }
   })
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
 })
 
 app.on('window-all-closed', () => {

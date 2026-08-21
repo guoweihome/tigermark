@@ -35,14 +35,25 @@ export interface TigerMarkApi {
     mimeType: string,
   ) => Promise<ApiResult<SavedImage>>
   platform: string
+  showItemInFolder: (targetPath: string) => Promise<ApiResult<void>>
   onMenuOpenDirectory: (cb: () => void) => () => void
   onMenuSave: (cb: () => void) => () => void
   onMenuViewMode: (cb: (mode: string) => void) => () => void
+  onMenuToggleSidebar: (cb: () => void) => () => void
+  onCloseRequest: (cb: () => void) => () => void
+  allowClose: () => void
+  denyClose: () => void
+  setNativeTheme: (theme: 'light' | 'dark' | 'system') => Promise<void>
+}
+
+interface QueryLocalFont {
+  family: string
 }
 
 declare global {
   interface Window {
     tigermark: TigerMarkApi
+    queryLocalFonts?: () => Promise<QueryLocalFont[]>
   }
 }
 

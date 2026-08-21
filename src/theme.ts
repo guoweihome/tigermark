@@ -37,6 +37,7 @@ export function useTheme() {
       document.documentElement.style.colorScheme = next
     }
     apply()
+    void window.tigermark?.setNativeTheme?.(preference)
 
     if (preference !== 'system') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
