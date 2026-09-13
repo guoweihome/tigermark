@@ -13,7 +13,7 @@ marked.setOptions({
 })
 
 function isRemoteOrData(href: string) {
-  return /^(https?:|data:|tmfile:|mailto:|#)/i.test(href)
+  return /^(https?:|data:|asset:|mailto:|#)/i.test(href)
 }
 
 function resolveLocalPath(baseDir: string, href: string) {
@@ -40,9 +40,11 @@ function toPreviewSrc(href: string | null | undefined, baseDir?: string | null) 
   if (!href) return ''
   if (isRemoteOrData(href)) return href
   if (!baseDir) return href
-  const absolute = resolveLocalPath(baseDir, href).replace(/\\/g, '/')
-  const withSlash = absolute.startsWith('/') ? absolute : `/${absolute}`
-  return `tmfile://${encodeURI(withSlash)}`
+  const absolute = resolveLocalPath(baseDir, href)
+  if (window.tigermark?.toFileUrl) {
+    return window.tigermark.toFileUrl(absolute)
+  }
+  return absolute
 }
 
 function escapeAttr(value: string) {
@@ -67,7 +69,7 @@ export function MarkdownPreview({ content, baseDir }: MarkdownPreviewProps) {
     return DOMPurify.sanitize(raw, {
       ADD_ATTR: ['target'],
       ALLOWED_URI_REGEXP:
-        /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|tmfile|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|asset|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     })
   }, [content, baseDir])
 

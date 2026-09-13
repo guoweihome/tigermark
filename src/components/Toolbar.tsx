@@ -139,7 +139,7 @@ export function Toolbar({
   const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length]
 
   return (
-    <header className={`toolbar${isMac ? ' is-mac' : ''}`}>
+    <header className={`toolbar${isMac ? ' is-mac' : ''}`} data-tauri-drag-region>
       <div className="toolbar-left">
         <button
           type="button"

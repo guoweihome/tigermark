@@ -34,6 +34,7 @@ export interface TigerMarkApi {
     bytes: ArrayBuffer,
     mimeType: string,
   ) => Promise<ApiResult<SavedImage>>
+  toFileUrl: (absolutePath: string) => string
   platform: string
   showItemInFolder: (targetPath: string) => Promise<ApiResult<void>>
   onMenuOpenDirectory: (cb: () => void) => () => void

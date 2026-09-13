@@ -1,0 +1,21 @@
+"$schema" = "https://schema.tauri.app/permission/2"
+
+[[permission]]
+identifier = "allow-app-commands"
+description = "Allow TigerMark desktop commands"
+commands.allow = [
+  "get_platform",
+  "dialog_open_directory",
+  "fs_read_directory",
+  "fs_read_file",
+  "fs_write_file",
+  "fs_create_file",
+  "fs_create_directory",
+  "fs_delete_path",
+  "fs_rename_path",
+  "fs_save_image",
+  "shell_show_item_in_folder",
+  "theme_set",
+  "window_close_allow",
+  "window_close_deny",
+]

@@ -1,0 +1,23 @@
+{
+  "version": "1.0.1",
+  "notes": "TigerMark 1.0.1",
+  "pub_date": "2026-09-13T00:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "REPLACE_WITH_SIG_CONTENTS",
+      "url": "https://www.pytiger.com/tigermark/updates/TigerMark.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "REPLACE_WITH_SIG_CONTENTS",
+      "url": "https://www.pytiger.com/tigermark/updates/TigerMark.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "REPLACE_WITH_SIG_CONTENTS",
+      "url": "https://www.pytiger.com/tigermark/updates/TigerMark-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "REPLACE_WITH_SIG_CONTENTS",
+      "url": "https://www.pytiger.com/tigermark/updates/TigerMark.AppImage"
+    }
+  }
+}

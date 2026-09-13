@@ -5,6 +5,7 @@
 # 2. 新建流水线 → 选择「YAML 配置」→ 粘贴本文件内容
 # 3. 触发方式建议设为：推送 Tag（如 v1.0.0）时自动运行
 # 4. 首次运行前确认已开通 Gitee Go，并具备创建发行版权限
+# 5. 在流水线密钥中配置 TAURI_SIGNING_PRIVATE_KEY（updater 私钥内容）
 #
 # 说明：
 # - 云端默认是 Linux，只能打 AppImage / deb
@@ -30,20 +31,27 @@ stages:
     steps:
       - step: build@nodejs
         name: build_linux
-        displayName: Node.js 打包
-        # 若插件表单要求选择 Node 版本，选 20 LTS
+        displayName: Node.js + Tauri 打包
         nodeVersion: 20.11.1
         commands:
           - node -v && npm -v
+          - command -v rustc || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          - . "$HOME/.cargo/env"
+          - rustc --version && cargo --version
+          - |
+            if command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+            fi
           - npm ci
-          - npm run build
-          - npx electron-builder --linux AppImage deb --publish never
-          - ls -lah release/
+          - npm run dist -- --bundles appimage,deb
+          - ls -lah src-tauri/target/release/bundle/appimage src-tauri/target/release/bundle/deb || true
         artifacts:
           - name: TIGERMARK_LINUX
             path:
-              - release/*.AppImage
-              - release/*.deb
+              - src-tauri/target/release/bundle/appimage/*.AppImage
+              - src-tauri/target/release/bundle/appimage/*.sig
+              - src-tauri/target/release/bundle/deb/*.deb
         caches:
           - node_modules
 
@@ -54,7 +62,6 @@ stages:
       - step: release@gitee
         name: release_gitee
         displayName: 上传到 Gitee 发行版
-        # Tag 使用触发流水线的 Git Tag；若插件不支持自动读取，改为 ${GITEE_TAG}
         tagName: ${GITEE_TAG}
         releaseName: TigerMark ${GITEE_TAG}
         description: |
@@ -69,7 +76,7 @@ stages:
         upstreamArtifact:
           - TIGERMARK_LINUX
         assertFiles:
-          - release/*.AppImage
-          - release/*.deb
+          - src-tauri/target/release/bundle/appimage/*.AppImage
+          - src-tauri/target/release/bundle/deb/*.deb
         prerelease: false
         allowUpdate: true
