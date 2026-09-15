@@ -49,6 +49,7 @@ jobs:
       - run: npm ci
 
       - name: Prepare updater signing key
+        shell: bash
         env:
           RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
