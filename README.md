@@ -88,8 +88,8 @@ npm run dist
 仓库已包含 [`.github/workflows/release.yml`](.github/workflows/release.yml)。推送到 GitHub 后：
 
 1. 打开 https://github.com/guoweihome/tigermark → **Settings → Secrets and variables → Actions → New repository secret**，添加：
-   - `TAURI_SIGNING_PRIVATE_KEY`：本机 `~/.tauri/tigermark.key` 的**文件内容**（不要提交这个文件）
-   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`：生成密钥时的密码；当时若为空就填空字符串，或也建一个空值 Secret
+   - `TAURI_SIGNING_PRIVATE_KEY`：本机 `~/.tauri/tigermark.key` 的**整行内容**（以 `dW50` 开头的那一行，不要提交这个文件）
+   - **不要**创建 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。当前钥匙是空密码；填了密码反而会报 `Missing comment in secret key`
 2. **Settings → Actions → General → Workflow permissions** 勾选 **Read and write permissions**（否则无法创建 Release）
 3. 触发方式任选其一：
    - 推送标签：`git tag v2.0.0 && git push github tauri:main && git push github v2.0.0`

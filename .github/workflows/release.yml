@@ -48,11 +48,23 @@ jobs:
 
       - run: npm ci
 
+      - name: Prepare updater signing key
+        env:
+          RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$RAW_KEY" ]; then
+            echo "Missing repository secret TAURI_SIGNING_PRIVATE_KEY"
+            exit 1
+          fi
+          printf '%s' "$RAW_KEY" > "$RUNNER_TEMP/tigermark.key"
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$RUNNER_TEMP/tigermark.key" >> "$GITHUB_ENV"
+          echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=" >> "$GITHUB_ENV"
+
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: TigerMark ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
