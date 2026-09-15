@@ -3,7 +3,7 @@
 # 用法：
 # 1. 打开 https://gitee.com/pytiger/tigermark →「流水线 / Gitee Go」
 # 2. 新建流水线 → 选择「YAML 配置」→ 粘贴本文件内容
-# 3. 触发方式建议设为：推送 Tag（如 v1.0.0）时自动运行
+# 3. 触发方式建议设为：推送 Tag（如 v2.0.0）时自动运行
 # 4. 首次运行前确认已开通 Gitee Go，并具备创建发行版权限
 # 5. 在流水线密钥中配置 TAURI_SIGNING_PRIVATE_KEY（updater 私钥内容）
 #

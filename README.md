@@ -95,7 +95,7 @@ npm run dist
 
 ### 用 Gitee 发行版提供下载
 
-1. 打标签并推送：`git tag v1.0.0 && git push origin v1.0.0`
+1. 打标签并推送：`git tag v2.0.0 && git push origin v2.0.0`
 2. 仓库页 → **发行版** → **创建发行版**，选择该 Tag
 3. 上传安装包作为附件
 
@@ -106,7 +106,7 @@ npm run dist
 1. 打开仓库 → **流水线 / Gitee Go** → 新建流水线
 2. 选择 **YAML 配置**，粘贴 `.gitee/pipelines/release-linux.yml` 内容
 3. 触发条件设为推送 `v*` Tag
-4. 推送例如 `v1.0.0` 后查看构建与发行版附件
+4. 推送例如 `v2.0.0` 后查看构建与发行版附件
 
 > 云端一般为 Linux，只能自动产出 AppImage / deb。macOS / Windows 包仍需本机 `npm run dist` 后手动挂到同一发行版。
 
