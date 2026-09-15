@@ -46,6 +46,7 @@ pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         )?
     };
 
+    let find = MenuItem::with_id(app, "find", "查找…", true, Some("CmdOrCtrl+F"))?;
     let edit = Submenu::with_items(
         app,
         "编辑",
@@ -58,6 +59,8 @@ pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::copy(app, Some("复制"))?,
             &PredefinedMenuItem::paste(app, Some("粘贴"))?,
             &PredefinedMenuItem::select_all(app, Some("全选"))?,
+            &PredefinedMenuItem::separator(app)?,
+            &find,
         ],
     )?;
 
@@ -126,6 +129,9 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         "toggle-sidebar" => {
             let _ = app.emit("menu:toggle-sidebar", ());
+        }
+        "find" => {
+            let _ = app.emit("menu:find", ());
         }
         "devtools" => {
             if let Some(window) = app.get_webview_window("main") {

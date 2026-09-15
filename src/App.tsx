@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry, ViewMode } from './vite-env'
 import { ConfirmLeaveDialog } from './components/ConfirmLeaveDialog'
 import { FileTree } from './components/FileTree'
-import { MarkdownEditor } from './components/MarkdownEditor'
-import { MarkdownPreview } from './components/MarkdownPreview'
+import { MarkdownEditor, type MarkdownEditorHandle } from './components/MarkdownEditor'
+import { MarkdownPreview, type MarkdownPreviewHandle } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
 import { IconFolder, IconNewFile, IconNewFolder } from './components/icons'
 import { Toolbar } from './components/Toolbar'
@@ -130,6 +130,9 @@ export default function App() {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
   const savingRef = useRef(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const editorRef = useRef<MarkdownEditorHandle>(null)
+  const previewRef = useRef<MarkdownPreviewHandle>(null)
+  const [findTarget, setFindTarget] = useState<'editor' | 'preview'>('editor')
   const contentRef = useRef(content)
   const activePathRef = useRef(activePath)
   const dirtyRef = useRef(dirty)
@@ -154,6 +157,11 @@ export default function App() {
   rootPathRef.current = rootPath
   expandedPathsRef.current = expandedPaths
   sidebarOpenRef.current = sidebarOpen
+
+  useEffect(() => {
+    if (viewMode === 'preview') setFindTarget('preview')
+    if (viewMode === 'edit') setFindTarget('editor')
+  }, [viewMode])
 
   const filteredTree = useMemo(() => filterTree(tree, fileQuery), [tree, fileQuery])
   const hasFilter = fileQuery.trim().length > 0
@@ -205,6 +213,32 @@ export default function App() {
       searchInputRef.current?.select()
     }, 60)
   }, [])
+
+  const openFind = useCallback(() => {
+    const editorVisible = viewMode === 'edit' || viewMode === 'split'
+    const previewVisible = viewMode === 'preview' || viewMode === 'split'
+    if (previewVisible && (!editorVisible || findTarget === 'preview')) {
+      previewRef.current?.openFind()
+      return
+    }
+    editorRef.current?.openSearch()
+  }, [viewMode, findTarget])
+
+  const findStep = useCallback(
+    (dir: 'next' | 'prev') => {
+      const editorVisible = viewMode === 'edit' || viewMode === 'split'
+      const previewVisible = viewMode === 'preview' || viewMode === 'split'
+      const usePreview = previewVisible && (!editorVisible || findTarget === 'preview')
+      if (usePreview) {
+        if (dir === 'next') previewRef.current?.findNext()
+        else previewRef.current?.findPrev()
+        return
+      }
+      if (dir === 'next') editorRef.current?.findNext()
+      else editorRef.current?.findPrev()
+    },
+    [viewMode, findTarget],
+  )
 
   const persistSession = useCallback(
     (next?: {
@@ -551,13 +585,15 @@ export default function App() {
       }
     })
     const offSidebar = window.tigermark.onMenuToggleSidebar?.(toggleSidebar)
+    const offFind = window.tigermark.onMenuFind?.(openFind)
     return () => {
       offOpen()
       offSave()
       offView()
       offSidebar?.()
+      offFind?.()
     }
-  }, [openDirectory, saveFile, toggleSidebar])
+  }, [openDirectory, saveFile, toggleSidebar, openFind])
 
   useEffect(() => {
     const onCloseRequest = () => {
@@ -610,10 +646,18 @@ export default function App() {
         e.preventDefault()
         setFontSize(DEFAULT_FONT_SIZE)
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        openFind()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault()
+        findStep(e.shiftKey ? 'prev' : 'next')
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [saveFile, focusFileSearch, toggleSidebar, bumpFontSize])
+  }, [saveFile, focusFileSearch, toggleSidebar, bumpFontSize, openFind, findStep])
 
   const onResizeStart = (e: { preventDefault(): void; clientX: number }) => {
     e.preventDefault()
@@ -853,9 +897,11 @@ export default function App() {
                       ? { flex: `0 0 ${splitRatio * 100}%` }
                       : undefined
                   }
+                  onFocusCapture={() => setFindTarget('editor')}
                 >
                   <MarkdownEditor
                     key={activePath}
+                    ref={editorRef}
                     value={content}
                     theme={resolvedTheme}
                     onChange={handleContentChange}
@@ -877,8 +923,16 @@ export default function App() {
                 </div>
               )}
               {showPreview && (
-                <section className="pane preview-pane">
-                  <MarkdownPreview content={content} baseDir={dirname(activePath)} />
+                <section
+                  className="pane preview-pane"
+                  onFocusCapture={() => setFindTarget('preview')}
+                  onMouseDown={() => setFindTarget('preview')}
+                >
+                  <MarkdownPreview
+                    ref={previewRef}
+                    content={content}
+                    baseDir={dirname(activePath)}
+                  />
                 </section>
               )}
             </div>
@@ -890,6 +944,8 @@ export default function App() {
                 <kbd>⌘/Ctrl</kbd>+<kbd>B</kbd> 侧边栏
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>P</kbd> 搜索文件
+                <span>·</span>
+                <kbd>⌘/Ctrl</kbd>+<kbd>F</kbd> 查找
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>S</kbd> 保存
                 <span>·</span>

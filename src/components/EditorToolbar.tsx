@@ -3,6 +3,7 @@ interface EditorToolbarProps {
   onHeading: (level: number) => void
   onInsertTable: () => void
   onFormatJson: () => void
+  onFind: () => void
 }
 
 export function EditorToolbar({
@@ -10,6 +11,7 @@ export function EditorToolbar({
   onHeading,
   onInsertTable,
   onFormatJson,
+  onFind,
 }: EditorToolbarProps) {
   return (
     <div className="editor-toolbar" role="toolbar" aria-label="编辑工具">
@@ -48,6 +50,15 @@ export function EditorToolbar({
           onClick={onFormatJson}
         >
           JSON 格式化
+        </button>
+        <button
+          type="button"
+          className="editor-tool-btn"
+          title="查找（⌘/Ctrl+F）"
+          disabled={disabled}
+          onClick={onFind}
+        >
+          查找
         </button>
       </div>
     </div>

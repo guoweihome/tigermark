@@ -1,9 +1,18 @@
-import { useEffect, useRef } from 'react'
-import { EditorView, keymap } from '@codemirror/view'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { Compartment, EditorState } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { bracketMatching } from '@codemirror/language'
+import {
+  findNext,
+  findPrevious,
+  highlightSelectionMatches,
+  openSearchPanel,
+  search,
+  searchKeymap,
+  searchPanelOpen,
+} from '@codemirror/search'
 import { EditorToolbar } from './EditorToolbar'
 import {
   applyHeading,
@@ -21,13 +30,20 @@ interface MarkdownEditorProps {
   onMessage?: (message: string) => void
 }
 
-export function MarkdownEditor({
+export type MarkdownEditorHandle = {
+  openSearch: () => void
+  findNext: () => void
+  findPrev: () => void
+}
+
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
+  function MarkdownEditor({
   value,
   onChange,
   theme = 'light',
   onPasteImage,
   onMessage,
-}: MarkdownEditorProps) {
+}, ref) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const themeCompartment = useRef(new Compartment())
@@ -80,10 +96,13 @@ export function MarkdownEditor({
     const state = EditorState.create({
       doc: value,
       extensions: [
+        lineNumbers(),
         history(),
         bracketMatching(),
         markdown(),
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        search({ top: true }),
+        highlightSelectionMatches(),
+        keymap.of([indentWithTab, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorView.inputHandler.of(headingInputHandler),
         updateListener,
@@ -130,6 +149,24 @@ export function MarkdownEditor({
     fn(view)
   }
 
+  useImperativeHandle(ref, () => ({
+    openSearch: () =>
+      withView((view) => {
+        openSearchPanel(view)
+        view.focus()
+      }),
+    findNext: () =>
+      withView((view) => {
+        if (!searchPanelOpen(view.state)) openSearchPanel(view)
+        findNext(view)
+      }),
+    findPrev: () =>
+      withView((view) => {
+        if (!searchPanelOpen(view.state)) openSearchPanel(view)
+        findPrevious(view)
+      }),
+  }))
+
   return (
     <div className="editor-shell">
       <EditorToolbar
@@ -142,8 +179,14 @@ export function MarkdownEditor({
             else onMessageRef.current?.('JSON 已格式化')
           })
         }
+        onFind={() =>
+          withView((view) => {
+            openSearchPanel(view)
+            view.focus()
+          })
+        }
       />
       <div className="cm-host" ref={hostRef} />
     </div>
   )
-}
+})

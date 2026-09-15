@@ -59,11 +59,15 @@ const darkEditorTheme = EditorView.theme(
       lineHeight: 'var(--font-content-line-height)',
     },
     '.cm-content': {
-      padding: '28px 36px 80px 36px',
+      padding: '28px 36px 80px 20px',
       caretColor: '#e7e9ea',
     },
     '.cm-gutters': {
-      display: 'none',
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: '#7a8494',
+      minWidth: '48px',
+      paddingLeft: '16px',
     },
     '.cm-activeLine': {
       backgroundColor: 'transparent',
@@ -93,11 +97,15 @@ const lightEditorTheme = EditorView.theme({
     lineHeight: 'var(--font-content-line-height)',
   },
   '.cm-content': {
-    padding: '28px 36px 80px 36px',
+    padding: '28px 36px 80px 20px',
     caretColor: '#262626',
   },
   '.cm-gutters': {
-    display: 'none',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#9aa3ad',
+    minWidth: '48px',
+    paddingLeft: '16px',
   },
   '.cm-activeLine': {
     backgroundColor: 'transparent',

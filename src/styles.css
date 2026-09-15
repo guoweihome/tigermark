@@ -769,10 +769,117 @@ body:has(.resizer.is-resizing) {
   outline: none;
 }
 
+.cm-panels {
+  border-color: var(--line);
+  background: var(--bg-elevated);
+  color: var(--ink);
+}
+
+.cm-panel.cm-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.cm-panel.cm-search input,
+.cm-panel.cm-search button,
+.cm-panel.cm-search label {
+  font: inherit;
+  color: inherit;
+}
+
+.cm-panel.cm-search input {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.cm-panel.cm-search button {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+}
+
+.cm-panel.cm-search button:hover {
+  background: var(--hover-bg);
+}
+
+.cm-searchMatch {
+  background: rgba(255, 200, 60, 0.45);
+}
+
+.cm-searchMatch-selected {
+  background: rgba(255, 160, 40, 0.7);
+}
+
+.find-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elevated);
+}
+
+.find-bar-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.find-bar-count {
+  min-width: 3em;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.find-bar-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+.find-bar-btn:hover {
+  background: var(--hover-bg);
+  color: var(--ink);
+}
+
+mark.tm-find {
+  background: rgba(255, 200, 60, 0.45);
+  color: inherit;
+  padding: 0;
+}
+
+mark.tm-find-current {
+  background: rgba(255, 160, 40, 0.75);
+}
+
 .preview-scroll {
   flex: 1;
   overflow: auto;
   background: #ffffff;
+  display: flex;
+  flex-direction: column;
 }
 
 [data-theme='dark'] .preview-scroll {

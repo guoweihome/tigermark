@@ -47,6 +47,7 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
     onMenuSave: (cb) => onEvent('menu:save', () => cb()),
     onMenuViewMode: (cb) => onEvent<string>('menu:view-mode', cb),
     onMenuToggleSidebar: (cb) => onEvent('menu:toggle-sidebar', () => cb()),
+    onMenuFind: (cb) => onEvent('menu:find', () => cb()),
     onCloseRequest: (cb) => onEvent('window:close-request', () => cb()),
     allowClose: () => {
       void invoke('window_close_allow')

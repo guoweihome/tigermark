@@ -9,14 +9,15 @@
     "dev:vite": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
-    "dist": "tauri build",
-    "dist:win": "tauri build --bundles nsis",
+    "dist": "TAURI_SIGNING_PRIVATE_KEY_PATH=\"${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/tigermark.key}\" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=\"${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}\" tauri build",
+    "dist:win": "TAURI_SIGNING_PRIVATE_KEY_PATH=\"${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/tigermark.key}\" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=\"${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}\" tauri build --bundles nsis",
     "tauri": "tauri"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.0",
     "@codemirror/lang-markdown": "^6.3.2",
     "@codemirror/language": "^6.11.0",
+    "@codemirror/search": "^6.7.2",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.4",
     "@tauri-apps/api": "^2.9.0",
