@@ -34,7 +34,9 @@
   --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
-  --font-content: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-content: Menlo, Monaco, 'Courier New', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-content-size: 15px;
+  --font-content-line-height: 1.45;
 }
 
 [data-theme='dark'] {
@@ -311,6 +313,33 @@ button:disabled {
 .font-select:hover,
 .font-select:focus {
   border-color: color-mix(in srgb, var(--focus) 40%, var(--line));
+}
+
+.font-size-control {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  backdrop-filter: blur(12px);
+  -webkit-app-region: no-drag;
+}
+
+.font-size-control .titlebar-btn {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.font-size-value {
+  min-width: 1.6em;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink);
+  user-select: none;
 }
 
 .toolbar-brand {
@@ -855,8 +884,8 @@ body:has(.resizer.is-resizing) {
   margin: 0 auto;
   padding: 28px 36px 64px;
   font-family: var(--font-content);
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: var(--font-content-size);
+  line-height: var(--font-content-line-height);
   color: var(--ink);
 }
 

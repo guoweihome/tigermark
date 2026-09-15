@@ -1,6 +1,11 @@
 import type { ViewMode } from '../vite-env'
 import type { ThemePreference } from '../theme'
-import { PRESET_FONTS, listAvailableFonts } from '../fonts'
+import {
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  PRESET_FONTS,
+  listAvailableFonts,
+} from '../fonts'
 import { useEffect, useState } from 'react'
 
 interface ToolbarProps {
@@ -21,6 +26,8 @@ interface ToolbarProps {
   onCommandCenter: () => void
   fontFamily: string
   onFontChange: (font: string) => void
+  fontSize: number
+  onFontSizeChange: (size: number) => void
 }
 
 const THEME_CYCLE: ThemePreference[] = ['light', 'dark', 'system']
@@ -111,6 +118,8 @@ export function Toolbar({
   onCommandCenter,
   fontFamily,
   onFontChange,
+  fontSize,
+  onFontSizeChange,
 }: ToolbarProps) {
   const [fonts, setFonts] = useState<string[]>(() => {
     const presets: string[] = [...PRESET_FONTS]
@@ -228,6 +237,30 @@ export function Toolbar({
             ))}
           </select>
         </label>
+
+        <div className="font-size-control" title="编辑与预览字号">
+          <button
+            type="button"
+            className="titlebar-btn"
+            aria-label="减小字号"
+            disabled={fontSize <= FONT_SIZE_MIN}
+            onClick={() => onFontSizeChange(fontSize - 1)}
+          >
+            A−
+          </button>
+          <span className="font-size-value" aria-live="polite">
+            {fontSize}
+          </span>
+          <button
+            type="button"
+            className="titlebar-btn"
+            aria-label="增大字号"
+            disabled={fontSize >= FONT_SIZE_MAX}
+            onClick={() => onFontSizeChange(fontSize + 1)}
+          >
+            A+
+          </button>
+        </div>
 
         <button
           type="button"

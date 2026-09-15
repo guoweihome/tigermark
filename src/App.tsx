@@ -6,7 +6,14 @@ import { MarkdownEditor } from './components/MarkdownEditor'
 import { MarkdownPreview } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
 import { Toolbar } from './components/Toolbar'
-import { cssFontFamily, DEFAULT_FONT, revealInFolderLabel } from './fonts'
+import {
+  clampFontSize,
+  cssFontFamily,
+  DEFAULT_FONT,
+  DEFAULT_FONT_SIZE,
+  normalizeFontFamily,
+  revealInFolderLabel,
+} from './fonts'
 import { clearSession, readSession, writeSession } from './session'
 import { useTheme } from './theme'
 
@@ -84,13 +91,20 @@ function readUiPrefs() {
   try {
     const raw = localStorage.getItem(UI_STORAGE_KEY)
     if (!raw) {
-      return { sidebarWidth: 260, sidebarOpen: true, splitRatio: 0.5, fontFamily: DEFAULT_FONT }
+      return {
+        sidebarWidth: 260,
+        sidebarOpen: true,
+        splitRatio: 0.5,
+        fontFamily: DEFAULT_FONT,
+        fontSize: DEFAULT_FONT_SIZE,
+      }
     }
     const parsed = JSON.parse(raw) as {
       sidebarWidth?: unknown
       sidebarOpen?: unknown
       splitRatio?: unknown
       fontFamily?: unknown
+      fontSize?: unknown
     }
     const width =
       typeof parsed.sidebarWidth === 'number'
@@ -100,18 +114,22 @@ function readUiPrefs() {
       typeof parsed.splitRatio === 'number'
         ? Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, parsed.splitRatio))
         : 0.5
-    const fontFamily =
-      typeof parsed.fontFamily === 'string' && parsed.fontFamily.trim()
-        ? parsed.fontFamily
-        : DEFAULT_FONT
+    const fontFamily = normalizeFontFamily(parsed.fontFamily)
     return {
       sidebarWidth: width,
       sidebarOpen: parsed.sidebarOpen !== false,
       splitRatio,
       fontFamily,
+      fontSize: clampFontSize(parsed.fontSize ?? DEFAULT_FONT_SIZE),
     }
   } catch {
-    return { sidebarWidth: 260, sidebarOpen: true, splitRatio: 0.5, fontFamily: DEFAULT_FONT }
+    return {
+      sidebarWidth: 260,
+      sidebarOpen: true,
+      splitRatio: 0.5,
+      fontFamily: DEFAULT_FONT,
+      fontSize: DEFAULT_FONT_SIZE,
+    }
   }
 }
 
@@ -131,6 +149,7 @@ export default function App() {
   const [splitRatio, setSplitRatio] = useState(() => readUiPrefs().splitRatio)
   const [isSplitResizing, setIsSplitResizing] = useState(false)
   const [fontFamily, setFontFamily] = useState(() => readUiPrefs().fontFamily)
+  const [fontSize, setFontSize] = useState(() => readUiPrefs().fontSize)
   const [fileQuery, setFileQuery] = useState('')
   const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null)
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
@@ -167,13 +186,21 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(
       UI_STORAGE_KEY,
-      JSON.stringify({ sidebarWidth, sidebarOpen, splitRatio, fontFamily }),
+      JSON.stringify({ sidebarWidth, sidebarOpen, splitRatio, fontFamily, fontSize }),
     )
-  }, [sidebarWidth, sidebarOpen, splitRatio, fontFamily])
+  }, [sidebarWidth, sidebarOpen, splitRatio, fontFamily, fontSize])
 
   useEffect(() => {
     document.documentElement.style.setProperty('--font-content', cssFontFamily(fontFamily))
   }, [fontFamily])
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-content-size', `${fontSize}px`)
+  }, [fontSize])
+
+  const bumpFontSize = useCallback((delta: number) => {
+    setFontSize((current) => clampFontSize(current + delta))
+  }, [])
 
   const clearPeekTimer = () => {
     if (peekTimerRef.current !== null) {
@@ -596,10 +623,22 @@ export default function App() {
         e.preventDefault()
         toggleSidebar()
       }
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault()
+        bumpFontSize(1)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+        e.preventDefault()
+        bumpFontSize(-1)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault()
+        setFontSize(DEFAULT_FONT_SIZE)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [saveFile, focusFileSearch, toggleSidebar])
+  }, [saveFile, focusFileSearch, toggleSidebar, bumpFontSize])
 
   const onResizeStart = (e: { preventDefault(): void; clientX: number }) => {
     e.preventDefault()
@@ -710,6 +749,8 @@ export default function App() {
         }}
         fontFamily={fontFamily}
         onFontChange={setFontFamily}
+        fontSize={fontSize}
+        onFontSizeChange={(size) => setFontSize(clampFontSize(size))}
       />
 
       <div className={`workspace${isResizing ? ' is-resizing' : ''}${sidebarOpen ? '' : ' sidebar-closed'}`}>

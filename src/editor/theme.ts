@@ -30,23 +30,24 @@ const darkEditorTheme = EditorView.theme(
   {
     '&': {
       height: '100%',
-      fontSize: '15px',
+      fontSize: 'var(--font-content-size)',
       color: '#eef1f6',
       backgroundColor: 'transparent',
     },
     '.cm-scroller': {
       fontFamily: 'var(--font-content)',
-      lineHeight: '1.65',
+      lineHeight: 'var(--font-content-line-height)',
     },
     '.cm-content': {
-      padding: '16px 0',
+      padding: '16px 24px 16px 20px',
       caretColor: '#e8c07d',
     },
     '.cm-gutters': {
       backgroundColor: 'transparent',
       border: 'none',
       color: '#7a8494',
-      minWidth: '40px',
+      minWidth: '48px',
+      paddingLeft: '16px',
     },
     '.cm-activeLine': {
       backgroundColor: 'rgba(232, 192, 125, 0.08)',
@@ -68,23 +69,24 @@ const darkEditorTheme = EditorView.theme(
 const lightEditorTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '15px',
+    fontSize: 'var(--font-content-size)',
     color: '#12181f',
     backgroundColor: 'transparent',
   },
   '.cm-scroller': {
     fontFamily: 'var(--font-content)',
-    lineHeight: '1.65',
+    lineHeight: 'var(--font-content-line-height)',
   },
   '.cm-content': {
-    padding: '16px 0',
+    padding: '16px 24px 16px 20px',
     caretColor: '#c45c26',
   },
   '.cm-gutters': {
     backgroundColor: 'transparent',
     border: 'none',
     color: '#3a4452',
-    minWidth: '40px',
+    minWidth: '48px',
+    paddingLeft: '16px',
   },
   '.cm-activeLine': {
     backgroundColor: 'rgba(196, 92, 38, 0.06)',

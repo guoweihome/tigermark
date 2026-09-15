@@ -1,6 +1,23 @@
-export const DEFAULT_FONT = 'IBM Plex Sans'
+export const DEFAULT_FONT = 'Menlo'
+export const DEFAULT_FONT_SIZE = 15
+export const FONT_SIZE_MIN = 12
+export const FONT_SIZE_MAX = 24
+const LEGACY_DEFAULT_FONTS = new Set(['IBM Plex Sans'])
+
+export function normalizeFontFamily(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) return DEFAULT_FONT
+  if (LEGACY_DEFAULT_FONTS.has(value)) return DEFAULT_FONT
+  return value
+}
+
+export function clampFontSize(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return DEFAULT_FONT_SIZE
+  return Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, Math.round(n)))
+}
 
 export const PRESET_FONTS = [
+  'Menlo',
   'IBM Plex Sans',
   'JetBrains Mono',
   'Fraunces',
@@ -31,6 +48,9 @@ const GENERIC = new Set([
 
 export function cssFontFamily(name: string) {
   const trimmed = name.trim() || DEFAULT_FONT
+  if (trimmed === 'Menlo') {
+    return "Menlo, Monaco, 'Courier New', 'PingFang SC', 'Hiragino Sans GB', sans-serif"
+  }
   if (GENERIC.has(trimmed.toLowerCase())) {
     return `${trimmed}, var(--font-sans)`
   }
