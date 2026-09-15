@@ -5,6 +5,7 @@ import { FileTree } from './components/FileTree'
 import { MarkdownEditor } from './components/MarkdownEditor'
 import { MarkdownPreview } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
+import { IconFolder, IconNewFile, IconNewFolder } from './components/icons'
 import { Toolbar } from './components/Toolbar'
 import {
   clampFontSize,
@@ -29,32 +30,6 @@ function dirname(filePath: string) {
   const normalized = filePath.replace(/\\/g, '/')
   const index = normalized.lastIndexOf('/')
   return index === -1 ? normalized : normalized.slice(0, index)
-}
-
-function IconOpenFolder() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-      <path d="M1.75 2.5A1.75 1.75 0 0 0 0 4.25v7.5A1.75 1.75 0 0 0 1.75 13.5h12.5A1.75 1.75 0 0 0 16 11.75v-6A1.75 1.75 0 0 0 14.25 4H8.06l-.72-1.08A1.75 1.75 0 0 0 5.9 2.5H1.75z" />
-    </svg>
-  )
-}
-
-function IconNewFile() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-      <path d="M2.75 1.5A1.75 1.75 0 0 0 1 3.25v9.5c0 .966.784 1.75 1.75 1.75h5.5a.75.75 0 0 0 0-1.5h-5.5a.25.25 0 0 1-.25-.25V3.25a.25.25 0 0 1 .25-.25H8.5v2.5c0 .69.56 1.25 1.25 1.25h2.75v5.25a.25.25 0 0 1-.25.25h-.5a.75.75 0 0 0 0 1.5h.5A1.75 1.75 0 0 0 14 12.75V6.06c0-.464-.184-.91-.513-1.237L10.677 1.513A1.75 1.75 0 0 0 9.44 1H2.75zM10 2.56 12.44 5H10V2.56z" />
-      <path d="M12.75 10a.75.75 0 0 1 .75.75V12.5h1.75a.75.75 0 0 1 0 1.5H13.5v1.75a.75.75 0 0 1-1.5 0V14H10.25a.75.75 0 0 1 0-1.5H12v-1.75a.75.75 0 0 1 .75-.75z" />
-    </svg>
-  )
-}
-
-function IconNewFolder() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-      <path d="M1.75 2.5A1.75 1.75 0 0 0 0 4.25v7.5A1.75 1.75 0 0 0 1.75 13.5h6.5a.75.75 0 0 0 0-1.5h-6.5a.25.25 0 0 1-.25-.25v-7.5a.25.25 0 0 1 .25-.25h4.15c.192 0 .377.075.513.21l.97.97h3.67a.25.25 0 0 1 .25.25v.25a.75.75 0 0 0 1.5 0v-.25A1.75 1.75 0 0 0 11.3 4H7.06L6.34 2.92A1.75 1.75 0 0 0 5.9 2.5H1.75z" />
-      <path d="M12.75 8.25a.75.75 0 0 1 .75.75v1.75h1.75a.75.75 0 0 1 0 1.5H13.5v1.75a.75.75 0 0 1-1.5 0V12.25H10.25a.75.75 0 0 1 0-1.5H12V9a.75.75 0 0 1 .75-.75z" />
-    </svg>
-  )
 }
 
 function filterTree(entries: FileEntry[], query: string): FileEntry[] {
@@ -709,16 +684,6 @@ export default function App() {
 
   return (
     <div className={`app${isMac ? ' is-mac' : ''}`}>
-      <div className="dew-layer" aria-hidden="true">
-        <span className="dew-drop d1" />
-        <span className="dew-drop d2" />
-        <span className="dew-drop d3" />
-        <span className="dew-drop d4" />
-        <span className="dew-drop d5" />
-        <span className="dew-drop d6" />
-        <span className="dew-drop d7" />
-        <span className="dew-drop d8" />
-      </div>
       <Toolbar
         isMac={isMac}
         fileName={activePath ? basename(activePath) : null}
@@ -781,7 +746,7 @@ export default function App() {
                   title="打开文件夹"
                   onClick={() => void openDirectory()}
                 >
-                  <IconOpenFolder />
+                  <IconFolder />
                 </button>
                 <button
                   type="button"

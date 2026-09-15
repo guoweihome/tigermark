@@ -60,9 +60,10 @@ export function MarkdownPreview({ content, baseDir }: MarkdownPreviewProps) {
     const renderer = new Renderer()
     renderer.image = ({ href, title, text }) => {
       const src = toPreviewSrc(href, baseDir)
-      const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
       const alt = escapeAttr(text || '')
-      return `<img src="${escapeAttr(src)}" alt="${alt}"${titleAttr} />`
+      const img = `<img src="${escapeAttr(src)}" alt="${alt}" />`
+      if (!title) return img
+      return `<figure>${img}<figcaption>${escapeAttr(title)}</figcaption></figure>`
     }
 
     const raw = marked.parse(content || '', { renderer }) as string

@@ -35,7 +35,6 @@ pub fn run() {
             let handle = app.handle();
             let menu = menu::build_menu(handle)?;
             app.set_menu(menu)?;
-            apply_window_effects(handle);
             updater::setup_auto_updater(handle.clone());
             Ok(())
         })
@@ -58,27 +57,3 @@ pub fn run() {
         .expect("error while running TigerMark");
 }
 
-fn apply_window_effects(app: &tauri::AppHandle) {
-    let Some(window) = app.get_webview_window("main") else {
-        return;
-    };
-
-    #[cfg(target_os = "macos")]
-    {
-        use tauri::window::{Effect, EffectState, EffectsBuilder};
-        let _ = window.set_effects(
-            EffectsBuilder::new()
-                .effect(Effect::UnderWindowBackground)
-                .state(EffectState::FollowsWindowActiveState)
-                .build(),
-        );
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use tauri::window::{Effect, EffectsBuilder};
-        let _ = window.set_effects(EffectsBuilder::new().effect(Effect::Acrylic).build());
-    }
-
-    let _ = window;
-}

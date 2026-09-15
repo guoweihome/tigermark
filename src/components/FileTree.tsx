@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FileEntry } from '../vite-env'
+import { IconFile, IconFolder } from './icons'
 
 interface FileTreeProps {
   entries: FileEntry[]
@@ -59,7 +60,9 @@ function TreeNode({
           }}
         >
           <span className="chevron">{expanded ? '▾' : '▸'}</span>
-          <span className="node-icon folder">{expanded ? '📂' : '📁'}</span>
+          <span className="node-icon folder">
+            <IconFolder />
+          </span>
           <span className="node-name">{entry.name}</span>
           <button
             type="button"
@@ -126,7 +129,9 @@ function TreeNode({
         }}
       >
         <span className="chevron spacer" />
-        <span className="node-icon file">📄</span>
+        <span className="node-icon file">
+          <IconFile />
+        </span>
         <span className="node-name">{entry.name}</span>
         <button
           type="button"

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
+import { EditorView, keymap } from '@codemirror/view'
 import { Compartment, EditorState } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
@@ -80,8 +80,6 @@ export function MarkdownEditor({
     const state = EditorState.create({
       doc: value,
       extensions: [
-        lineNumbers(),
-        highlightActiveLine(),
         history(),
         bracketMatching(),
         markdown(),

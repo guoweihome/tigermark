@@ -1,29 +1,49 @@
-import { HighlightStyle, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 
+const lightHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading1, color: '#1a1a1a', fontWeight: '700' },
+  { tag: tags.heading2, color: '#1a1a1a', fontWeight: '700' },
+  { tag: tags.heading3, color: '#1a1a1a', fontWeight: '700' },
+  { tag: tags.heading4, color: '#1a1a1a', fontWeight: '600' },
+  { tag: tags.heading, color: '#1a1a1a', fontWeight: '700' },
+  { tag: tags.strong, color: '#1a1a1a', fontWeight: '700' },
+  { tag: tags.emphasis, color: '#3a4452', fontStyle: 'italic' },
+  { tag: tags.strikethrough, color: '#888', textDecoration: 'line-through' },
+  { tag: tags.link, color: '#0c6ada' },
+  { tag: tags.url, color: '#0c6ada' },
+  { tag: tags.monospace, color: '#24292e' },
+  { tag: tags.quote, color: '#777' },
+  { tag: tags.meta, color: '#9aa3ad' },
+  { tag: tags.processingInstruction, color: '#9aa3ad' },
+  { tag: tags.contentSeparator, color: '#c5ccd6' },
+  { tag: tags.comment, color: '#9aa3ad' },
+  { tag: tags.keyword, color: '#bf3889' },
+  { tag: tags.atom, color: '#8250df' },
+  { tag: tags.string, color: '#0c6ada' },
+])
+
 const darkHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading1, color: '#f2f4f6', fontWeight: '700' },
+  { tag: tags.heading2, color: '#f2f4f6', fontWeight: '700' },
+  { tag: tags.heading3, color: '#f2f4f6', fontWeight: '700' },
+  { tag: tags.heading4, color: '#e7e9ea', fontWeight: '600' },
+  { tag: tags.heading, color: '#f2f4f6', fontWeight: '700' },
+  { tag: tags.strong, color: '#f2f4f6', fontWeight: '700' },
+  { tag: tags.emphasis, color: '#c5ccd6', fontStyle: 'italic' },
+  { tag: tags.strikethrough, color: '#8b949e', textDecoration: 'line-through' },
+  { tag: tags.link, color: '#1d9bf0' },
+  { tag: tags.url, color: '#1d9bf0' },
+  { tag: tags.monospace, color: '#e7e9ea' },
+  { tag: tags.quote, color: '#abb2bf' },
   { tag: tags.meta, color: '#8b949e' },
-  { tag: tags.link, textDecoration: 'underline', color: '#7eb0e0' },
-  { tag: tags.heading, textDecoration: 'underline', fontWeight: 'bold', color: '#eef1f6' },
-  { tag: tags.emphasis, fontStyle: 'italic' },
-  { tag: tags.strong, fontWeight: 'bold' },
-  { tag: tags.strikethrough, textDecoration: 'line-through' },
-  { tag: tags.keyword, color: '#ff7b72' },
-  { tag: [tags.atom, tags.bool, tags.url, tags.contentSeparator, tags.labelName], color: '#79c0ff' },
-  { tag: [tags.literal, tags.inserted], color: '#a5d6ff' },
-  { tag: [tags.string, tags.deleted], color: '#a5d6a7' },
-  { tag: [tags.regexp, tags.escape, tags.special(tags.string)], color: '#e08a4f' },
-  { tag: tags.definition(tags.variableName), color: '#d2a8ff' },
-  { tag: tags.local(tags.variableName), color: '#ffa198' },
-  { tag: [tags.typeName, tags.namespace], color: '#7ee787' },
-  { tag: tags.className, color: '#f0b27a' },
-  { tag: [tags.special(tags.variableName), tags.macroName], color: '#d2a8ff' },
-  { tag: tags.definition(tags.propertyName), color: '#79c0ff' },
-  { tag: tags.comment, color: '#8b949e' },
-  { tag: tags.invalid, color: '#f07178' },
-  { tag: tags.monospace, color: '#e8edf4' },
   { tag: tags.processingInstruction, color: '#8b949e' },
+  { tag: tags.contentSeparator, color: '#5c6570' },
+  { tag: tags.comment, color: '#8b949e' },
+  { tag: tags.keyword, color: '#c084fc' },
+  { tag: tags.atom, color: '#99e0fc' },
+  { tag: tags.string, color: '#8ffccd' },
 ])
 
 const darkEditorTheme = EditorView.theme(
@@ -31,7 +51,7 @@ const darkEditorTheme = EditorView.theme(
     '&': {
       height: '100%',
       fontSize: 'var(--font-content-size)',
-      color: '#eef1f6',
+      color: '#e7e9ea',
       backgroundColor: 'transparent',
     },
     '.cm-scroller': {
@@ -39,28 +59,23 @@ const darkEditorTheme = EditorView.theme(
       lineHeight: 'var(--font-content-line-height)',
     },
     '.cm-content': {
-      padding: '16px 24px 16px 20px',
-      caretColor: '#e8c07d',
+      padding: '28px 36px 80px 36px',
+      caretColor: '#e7e9ea',
     },
     '.cm-gutters': {
-      backgroundColor: 'transparent',
-      border: 'none',
-      color: '#7a8494',
-      minWidth: '48px',
-      paddingLeft: '16px',
+      display: 'none',
     },
     '.cm-activeLine': {
-      backgroundColor: 'rgba(232, 192, 125, 0.08)',
+      backgroundColor: 'transparent',
     },
     '.cm-activeLineGutter': {
       backgroundColor: 'transparent',
-      color: '#e8c07d',
     },
     '&.cm-focused .cm-cursor': {
-      borderLeftColor: '#e8c07d',
+      borderLeftColor: '#e7e9ea',
     },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-      backgroundColor: 'rgba(126, 176, 224, 0.35)',
+      backgroundColor: 'rgba(29, 155, 240, 0.28)',
     },
   },
   { dark: true },
@@ -70,7 +85,7 @@ const lightEditorTheme = EditorView.theme({
   '&': {
     height: '100%',
     fontSize: 'var(--font-content-size)',
-    color: '#12181f',
+    color: '#262626',
     backgroundColor: 'transparent',
   },
   '.cm-scroller': {
@@ -78,28 +93,23 @@ const lightEditorTheme = EditorView.theme({
     lineHeight: 'var(--font-content-line-height)',
   },
   '.cm-content': {
-    padding: '16px 24px 16px 20px',
-    caretColor: '#c45c26',
+    padding: '28px 36px 80px 36px',
+    caretColor: '#262626',
   },
   '.cm-gutters': {
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#3a4452',
-    minWidth: '48px',
-    paddingLeft: '16px',
+    display: 'none',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(196, 92, 38, 0.06)',
+    backgroundColor: 'transparent',
   },
   '.cm-activeLineGutter': {
     backgroundColor: 'transparent',
-    color: '#c45c26',
   },
   '&.cm-focused .cm-cursor': {
-    borderLeftColor: '#c45c26',
+    borderLeftColor: '#262626',
   },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: 'rgba(106, 156, 196, 0.35)',
+    backgroundColor: 'rgba(12, 106, 218, 0.16)',
   },
 })
 
@@ -107,8 +117,5 @@ export function editorThemeExtensions(mode: 'light' | 'dark') {
   if (mode === 'dark') {
     return [darkEditorTheme, syntaxHighlighting(darkHighlightStyle, { fallback: true })]
   }
-  return [
-    lightEditorTheme,
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-  ]
+  return [lightEditorTheme, syntaxHighlighting(lightHighlightStyle, { fallback: true })]
 }
