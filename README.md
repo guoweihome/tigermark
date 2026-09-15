@@ -81,7 +81,23 @@ npm run dist
 | Windows | NSIS / MSI，以及对应 `.sig` |
 | Linux | AppImage / `.deb`，以及对应 `.sig` |
 
-请在对应操作系统上执行打包，以生成该平台安装包。
+请在对应操作系统上执行打包，以生成该平台安装包。没有 Windows 电脑时，用下面的 GitHub Actions 打 Windows / 全平台包。
+
+### GitHub Actions 自动打包
+
+仓库已包含 [`.github/workflows/release.yml`](.github/workflows/release.yml)。推送到 GitHub 后：
+
+1. 打开 https://github.com/guoweihome/tigermark → **Settings → Secrets and variables → Actions → New repository secret**，添加：
+   - `TAURI_SIGNING_PRIVATE_KEY`：本机 `~/.tauri/tigermark.key` 的**文件内容**（不要提交这个文件）
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`：生成密钥时的密码；当时若为空就填空字符串，或也建一个空值 Secret
+2. **Settings → Actions → General → Workflow permissions** 勾选 **Read and write permissions**（否则无法创建 Release）
+3. 触发方式任选其一：
+   - 推送标签：`git tag v2.0.0 && git push github tauri:main && git push github v2.0.0`
+   - 或仓库 **Actions → release → Run workflow** 手动跑
+4. 四个任务并行：Windows NSIS、Linux AppImage/deb、macOS Intel、macOS Apple Silicon
+5. 完成后在 **Releases** 里会有一份 **草稿**，检查附件后点 Publish
+
+macOS 云端包默认未做 Apple 公证；用户若提示已损坏，可执行 `xattr -cr /Applications/TigerMark.app`。
 
 ### 自动更新 feed
 
