@@ -368,6 +368,16 @@ pub fn window_close_deny(app: AppHandle) {
         .store(false, Ordering::SeqCst);
 }
 
+#[tauri::command]
+pub fn window_hide(window: WebviewWindow) {
+    let _ = window.hide();
+}
+
+#[tauri::command]
+pub fn app_quit(app: AppHandle) {
+    app.exit(0);
+}
+
 pub fn show_about(app: &AppHandle) {
     let version = app.package_info().version.to_string();
     let handle = app.clone();

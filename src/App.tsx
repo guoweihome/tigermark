@@ -352,6 +352,16 @@ export default function App() {
     }
   }, [])
 
+  const persistOpenFile = useCallback(async () => {
+    if (!dirtyRef.current || !activePathRef.current) return true
+    const started = Date.now()
+    while (savingRef.current && Date.now() - started < 5000) {
+      await new Promise((resolve) => window.setTimeout(resolve, 40))
+    }
+    if (!dirtyRef.current) return true
+    return saveFile()
+  }, [saveFile])
+
   const confirmUnsaved = useCallback(async () => {
     if (!dirtyRef.current) return true
     if (leaveResolverRef.current) return false
@@ -598,12 +608,28 @@ export default function App() {
   useEffect(() => {
     const onCloseRequest = () => {
       void (async () => {
-        const ok = await confirmUnsavedRef.current()
+        const ok = await persistOpenFile()
         if (ok) window.tigermark.allowClose()
         else window.tigermark.denyClose()
       })()
     }
     const offClose = window.tigermark?.onCloseRequest?.(onCloseRequest)
+
+    const onHideRequest = () => {
+      void (async () => {
+        await persistOpenFile()
+        window.tigermark.hideWindow()
+      })()
+    }
+    const offHide = window.tigermark?.onHideRequest?.(onHideRequest)
+
+    const onQuitRequest = () => {
+      void (async () => {
+        const ok = await persistOpenFile()
+        if (ok) window.tigermark.quit()
+      })()
+    }
+    const offQuit = window.tigermark?.onQuitRequest?.(onQuitRequest)
 
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!dirtyRef.current) return
@@ -616,9 +642,11 @@ export default function App() {
 
     return () => {
       offClose?.()
+      offHide?.()
+      offQuit?.()
       window.removeEventListener('beforeunload', onBeforeUnload)
     }
-  }, [])
+  }, [persistOpenFile])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

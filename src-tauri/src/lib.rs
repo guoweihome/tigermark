@@ -2,10 +2,11 @@ mod commands;
 mod menu;
 mod updater;
 
-use std::sync::atomic::Ordering;
-
 use commands::CloseState;
 use tauri::{Emitter, Manager, WindowEvent};
+
+#[cfg(not(target_os = "macos"))]
+use std::sync::atomic::Ordering;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +31,8 @@ pub fn run() {
             commands::theme_set,
             commands::window_close_allow,
             commands::window_close_deny,
+            commands::window_hide,
+            commands::app_quit,
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -43,17 +46,40 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                let allowed = window
-                    .state::<CloseState>()
-                    .allow_close
-                    .load(Ordering::SeqCst);
-                if !allowed {
+                #[cfg(target_os = "macos")]
+                {
                     api.prevent_close();
-                    let _ = window.emit("window:close-request", ());
+                    let _ = window.emit("window:hide-request", ());
+                    return;
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let allowed = window
+                        .state::<CloseState>()
+                        .allow_close
+                        .load(Ordering::SeqCst);
+                    if !allowed {
+                        api.prevent_close();
+                        let _ = window.emit("window:close-request", ());
+                    }
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running TigerMark");
+        .build(tauri::generate_context!())
+        .expect("error while building TigerMark")
+        .run(|app, event| {
+            match event {
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { .. } => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.unminimize();
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+                _ => {}
+            }
+        });
 }
 

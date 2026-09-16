@@ -49,11 +49,19 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
     onMenuToggleSidebar: (cb) => onEvent('menu:toggle-sidebar', () => cb()),
     onMenuFind: (cb) => onEvent('menu:find', () => cb()),
     onCloseRequest: (cb) => onEvent('window:close-request', () => cb()),
+    onHideRequest: (cb) => onEvent('window:hide-request', () => cb()),
+    onQuitRequest: (cb) => onEvent('app:quit-request', () => cb()),
     allowClose: () => {
       void invoke('window_close_allow')
     },
     denyClose: () => {
       void invoke('window_close_deny')
+    },
+    hideWindow: () => {
+      void invoke('window_hide')
+    },
+    quit: () => {
+      void invoke('app_quit')
     },
     setNativeTheme: (theme) => invoke('theme_set', { theme }),
   }

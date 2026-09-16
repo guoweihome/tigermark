@@ -18,4 +18,6 @@ commands.allow = [
   "theme_set",
   "window_close_allow",
   "window_close_deny",
+  "window_hide",
+  "app_quit",
 ]

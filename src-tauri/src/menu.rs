@@ -16,6 +16,7 @@ pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let website = MenuItem::with_id(app, "website", "官网", true, None::<&str>)?;
     let website_help = MenuItem::with_id(app, "website", "官网", true, None::<&str>)?;
     let check_updates = MenuItem::with_id(app, "check-updates", "检查更新…", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出 TigerMark", true, Some("CmdOrCtrl+Q"))?;
     let about = MenuItem::with_id(app, "about", "关于 TigerMark", true, None::<&str>)?;
     #[allow(unused_variables)]
     let about_help = MenuItem::with_id(app, "about", "关于 TigerMark", true, None::<&str>)?;
@@ -101,7 +102,7 @@ pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 &PredefinedMenuItem::hide_others(app, None)?,
                 &PredefinedMenuItem::show_all(app, None)?,
                 &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::quit(app, None)?,
+                &quit,
             ],
         )?;
         Menu::with_items(app, &[&app_menu, &file, &edit, &view, &help])
@@ -132,6 +133,9 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         "find" => {
             let _ = app.emit("menu:find", ());
+        }
+        "quit" => {
+            let _ = app.emit("app:quit-request", ());
         }
         "devtools" => {
             if let Some(window) = app.get_webview_window("main") {
