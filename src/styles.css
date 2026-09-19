@@ -129,6 +129,7 @@ button:disabled {
 }
 
 .toolbar {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -137,8 +138,20 @@ button:disabled {
   padding: 0 10px;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--line);
-  -webkit-app-region: drag;
   user-select: none;
+}
+
+.toolbar-drag {
+  position: absolute;
+  top: 0;
+  right: -10px;
+  bottom: 0;
+  left: -10px;
+  z-index: 0;
+}
+
+.app.is-mac .toolbar-drag {
+  left: -86px;
 }
 
 .app.is-mac .toolbar {
@@ -146,11 +159,25 @@ button:disabled {
 }
 
 .toolbar-left,
+.toolbar-center,
+.toolbar-right {
+  position: relative;
+  z-index: 1;
+}
+
+.toolbar-left,
 .toolbar-right {
   display: flex;
   align-items: center;
   gap: 2px;
-  -webkit-app-region: no-drag;
+}
+
+.toolbar-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
 }
 
 .toolbar-left {
@@ -164,8 +191,7 @@ button:disabled {
 }
 
 .command-center {
-  justify-self: center;
-  width: 100%;
+  width: min(520px, 100%);
   max-width: 520px;
   height: 26px;
   display: grid;
@@ -767,6 +793,10 @@ body:has(.resizer.is-resizing) {
 .cm-host .cm-editor {
   height: 100%;
   outline: none;
+}
+
+.cm-host .cm-md-mark {
+  color: var(--accent);
 }
 
 .cm-panels {

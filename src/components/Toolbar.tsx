@@ -6,7 +6,8 @@ import {
   PRESET_FONTS,
   listAvailableFonts,
 } from '../fonts'
-import { useEffect, useState } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { useEffect, useState, type MouseEvent } from 'react'
 import {
   IconFolder,
   IconMonitor,
@@ -91,6 +92,14 @@ export function Toolbar({
       cancelled = true
     }
   }, [])
+  const onTitlebarMouseDown = (event: MouseEvent<HTMLElement>) => {
+    if (event.button !== 0) return
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (target.closest('button, select, input, textarea, a, label')) return
+    void getCurrentWindow().startDragging().catch(() => {})
+  }
+
   const shortcut = isMac ? '⌘P' : 'Ctrl+P'
   const title = folderName
     ? fileName
@@ -100,7 +109,8 @@ export function Toolbar({
   const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length]
 
   return (
-    <header className={`toolbar${isMac ? ' is-mac' : ''}`} data-tauri-drag-region>
+    <header className={`toolbar${isMac ? ' is-mac' : ''}`} onMouseDown={onTitlebarMouseDown}>
+      <div className="toolbar-drag" data-tauri-drag-region />
       <div className="toolbar-left">
         <button
           type="button"
@@ -124,26 +134,28 @@ export function Toolbar({
         </button>
       </div>
 
-      <button
-        type="button"
-        className="command-center"
-        title="搜索文件"
-        onClick={onCommandCenter}
-      >
-        <span className="command-center-title">
-          {fileName ? (
-            <>
-              {folderName && <span className="command-center-folder">{folderName}</span>}
-              {folderName && <span className="command-center-sep">/</span>}
-              <span className="command-center-file">{fileName}</span>
-              {dirty && <span className="dirty-dot" title="未保存" />}
-            </>
-          ) : (
-            <span className="command-center-placeholder">{title}</span>
-          )}
-        </span>
-        <kbd className="command-center-key">{shortcut}</kbd>
-      </button>
+      <div className="toolbar-center">
+        <button
+          type="button"
+          className="command-center"
+          title="搜索文件"
+          onClick={onCommandCenter}
+        >
+          <span className="command-center-title">
+            {fileName ? (
+              <>
+                {folderName && <span className="command-center-folder">{folderName}</span>}
+                {folderName && <span className="command-center-sep">/</span>}
+                <span className="command-center-file">{fileName}</span>
+                {dirty && <span className="dirty-dot" title="未保存" />}
+              </>
+            ) : (
+              <span className="command-center-placeholder">{title}</span>
+            )}
+          </span>
+          <kbd className="command-center-key">{shortcut}</kbd>
+        </button>
+      </div>
 
       <div className="toolbar-right">
         <button

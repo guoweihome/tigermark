@@ -20,6 +20,7 @@ import {
   headingInputHandler,
   insertTable,
 } from '../editor/commands'
+import { markdownMarkHighlighter } from '../editor/markdownMarks'
 import { editorThemeExtensions } from '../editor/theme'
 
 interface MarkdownEditorProps {
@@ -100,6 +101,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         history(),
         bracketMatching(),
         markdown(),
+        markdownMarkHighlighter,
         search({ top: true }),
         highlightSelectionMatches(),
         keymap.of([indentWithTab, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),

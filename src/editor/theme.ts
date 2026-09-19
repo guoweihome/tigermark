@@ -15,9 +15,10 @@ const lightHighlightStyle = HighlightStyle.define([
   { tag: tags.url, color: '#0c6ada' },
   { tag: tags.monospace, color: '#24292e' },
   { tag: tags.quote, color: '#777' },
-  { tag: tags.meta, color: '#9aa3ad' },
-  { tag: tags.processingInstruction, color: '#9aa3ad' },
-  { tag: tags.contentSeparator, color: '#c5ccd6' },
+  { tag: tags.meta, color: '#c45c26' },
+  { tag: tags.processingInstruction, color: '#c45c26' },
+  { tag: tags.contentSeparator, color: '#c45c26' },
+  { tag: tags.punctuation, color: '#c45c26' },
   { tag: tags.comment, color: '#9aa3ad' },
   { tag: tags.keyword, color: '#bf3889' },
   { tag: tags.atom, color: '#8250df' },
@@ -37,9 +38,10 @@ const darkHighlightStyle = HighlightStyle.define([
   { tag: tags.url, color: '#1d9bf0' },
   { tag: tags.monospace, color: '#e7e9ea' },
   { tag: tags.quote, color: '#abb2bf' },
-  { tag: tags.meta, color: '#8b949e' },
-  { tag: tags.processingInstruction, color: '#8b949e' },
-  { tag: tags.contentSeparator, color: '#5c6570' },
+  { tag: tags.meta, color: '#e08a4f' },
+  { tag: tags.processingInstruction, color: '#e08a4f' },
+  { tag: tags.contentSeparator, color: '#e08a4f' },
+  { tag: tags.punctuation, color: '#e08a4f' },
   { tag: tags.comment, color: '#8b949e' },
   { tag: tags.keyword, color: '#c084fc' },
   { tag: tags.atom, color: '#99e0fc' },
@@ -81,6 +83,9 @@ const darkEditorTheme = EditorView.theme(
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
       backgroundColor: 'rgba(29, 155, 240, 0.28)',
     },
+    '.cm-md-mark': {
+      color: 'var(--accent)',
+    },
   },
   { dark: true },
 )
@@ -118,6 +123,9 @@ const lightEditorTheme = EditorView.theme({
   },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
     backgroundColor: 'rgba(12, 106, 218, 0.16)',
+  },
+  '.cm-md-mark': {
+    color: 'var(--accent)',
   },
 })
 
