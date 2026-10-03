@@ -1,5 +1,6 @@
 mod commands;
 mod menu;
+mod sync;
 mod updater;
 
 use commands::CloseState;
@@ -33,8 +34,12 @@ pub fn run() {
             commands::window_close_deny,
             commands::window_hide,
             commands::app_quit,
+            sync::sync_info,
+            sync::sync_set_workspace,
         ])
         .setup(|app| {
+            let handle = app.handle().clone();
+            app.manage(sync::start(handle));
             let handle = app.handle();
             let menu = menu::build_menu(handle)?;
             app.set_menu(menu)?;

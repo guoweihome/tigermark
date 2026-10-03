@@ -79,6 +79,12 @@ fn is_hidden_dir(name: &str) -> bool {
         .any(|dir| name.eq_ignore_ascii_case(dir))
 }
 
+fn is_board_file(name: &str) -> bool {
+    name.to_ascii_lowercase().ends_with(".board.json")
+}
+
+pub(crate) const EMPTY_BOARD: &str = "{\"version\":1,\"strokes\":[]}\n";
+
 fn is_markdown_file(name: &str) -> bool {
     let ext = Path::new(name)
         .extension()
@@ -118,7 +124,7 @@ fn read_directory_tree(dir_path: &Path, depth: u8) -> Result<Vec<FileNode>, Stri
                 is_directory: true,
                 children: Some(children),
             });
-        } else if is_markdown_file(&name) {
+        } else if is_markdown_file(&name) || is_board_file(&name) {
             nodes.push(FileNode {
                 name,
                 path: path_string(&full_path),
@@ -136,6 +142,65 @@ fn read_directory_tree(dir_path: &Path, depth: u8) -> Result<Vec<FileNode>, Stri
     Ok(nodes)
 }
 
+fn assign_relative(node: &mut FileNode, root: &Path) {
+    let full = PathBuf::from(&node.path);
+    if let Ok(stripped) = full.strip_prefix(root) {
+        let rel = stripped.to_string_lossy().replace('\\', "/");
+        node.path = if rel.is_empty() {
+            node.name.clone()
+        } else {
+            rel
+        };
+    }
+    if let Some(children) = node.children.as_mut() {
+        for child in children.iter_mut() {
+            assign_relative(child, root);
+        }
+    }
+}
+
+pub(crate) fn read_tree_relative(root: &Path) -> Result<Vec<FileNode>, String> {
+    let mut nodes = read_directory_tree(root, 0)?;
+    for node in &mut nodes {
+        assign_relative(node, root);
+    }
+    Ok(nodes)
+}
+
+pub(crate) fn safe_entry_name(name: &str) -> Result<&str, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty()
+        || trimmed == "."
+        || trimmed == ".."
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || trimmed.contains('\0')
+    {
+        return Err("名称不合法".into());
+    }
+    Ok(trimmed)
+}
+
+pub(crate) fn new_file_name(name: &str) -> Result<String, String> {
+    let name = safe_entry_name(name)?;
+    let lower = name.to_ascii_lowercase();
+    if lower.ends_with(".board.json") || MARKDOWN_EXTS.iter().any(|ext| lower.ends_with(ext)) {
+        return Ok(name.to_string());
+    }
+    Ok(format!("{name}.md"))
+}
+
+pub(crate) fn initial_file_content(file_name: &str) -> String {
+    if file_name.to_ascii_lowercase().ends_with(".board.json") {
+        return EMPTY_BOARD.to_string();
+    }
+    let stem = Path::new(file_name)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("untitled");
+    format!("# {stem}\n\n")
+}
+
 fn mime_to_ext(mime_type: &str) -> &'static str {
     match mime_type {
         "image/jpeg" => ".jpg",
@@ -144,6 +209,10 @@ fn mime_to_ext(mime_type: &str) -> &'static str {
         "image/svg+xml" => ".svg",
         _ => ".png",
     }
+}
+
+pub(crate) fn image_file_name(mime_type: &str) -> String {
+    paste_image_name(mime_type)
 }
 
 fn paste_image_name(mime_type: &str) -> String {
@@ -215,60 +284,65 @@ pub async fn fs_read_file(file_path: String) -> ApiResult<String> {
 }
 
 #[tauri::command]
-pub async fn fs_write_file(file_path: String, content: String) -> ApiResult<()> {
+pub async fn fs_write_file(app: AppHandle, file_path: String, content: String) -> ApiResult<()> {
+    let event_path = file_path.clone();
     let result = tauri::async_runtime::spawn_blocking(move || fs::write(file_path, content)).await;
     match result {
-        Ok(Ok(())) => ok(()),
+        Ok(Ok(())) => {
+            crate::sync::notify(&app, "write", Some(&event_path), "desktop");
+            ok(())
+        }
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_create_file(dir_path: String, name: String) -> ApiResult<String> {
+pub async fn fs_create_file(app: AppHandle, dir_path: String, name: String) -> ApiResult<String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let file_name = if name.to_ascii_lowercase().ends_with(".md") {
-            name
-        } else {
-            format!("{name}.md")
-        };
+        let file_name = new_file_name(&name)?;
         let file_path = Path::new(&dir_path).join(&file_name);
-        let stem = file_path
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("untitled");
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&file_path)?;
-        write!(file, "# {stem}\n\n")?;
-        Ok::<_, std::io::Error>(path_string(&file_path))
+            .open(&file_path)
+            .map_err(|err| err.to_string())?;
+        write!(file, "{}", initial_file_content(&file_name)).map_err(|err| err.to_string())?;
+        Ok::<_, String>(path_string(&file_path))
     })
     .await;
     match result {
-        Ok(Ok(path)) => ok(path),
+        Ok(Ok(path)) => {
+            crate::sync::notify(&app, "tree", Some(&path), "desktop");
+            ok(path)
+        }
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_create_directory(dir_path: String, name: String) -> ApiResult<String> {
+pub async fn fs_create_directory(app: AppHandle, dir_path: String, name: String) -> ApiResult<String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let new_path = Path::new(&dir_path).join(name);
-        fs::create_dir(&new_path)?;
-        Ok::<_, std::io::Error>(path_string(&new_path))
+        let folder_name = safe_entry_name(&name)?.to_string();
+        let new_path = Path::new(&dir_path).join(folder_name);
+        fs::create_dir(&new_path).map_err(|err| err.to_string())?;
+        Ok::<_, String>(path_string(&new_path))
     })
     .await;
     match result {
-        Ok(Ok(path)) => ok(path),
+        Ok(Ok(path)) => {
+            crate::sync::notify(&app, "tree", Some(&path), "desktop");
+            ok(path)
+        }
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_delete_path(target_path: String) -> ApiResult<()> {
+pub async fn fs_delete_path(app: AppHandle, target_path: String) -> ApiResult<()> {
+    let event_path = target_path.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let path = PathBuf::from(target_path);
         let meta = fs::metadata(&path)?;
@@ -280,24 +354,35 @@ pub async fn fs_delete_path(target_path: String) -> ApiResult<()> {
     })
     .await;
     match result {
-        Ok(Ok(())) => ok(()),
+        Ok(Ok(())) => {
+            crate::sync::notify(&app, "delete", Some(&event_path), "desktop");
+            ok(())
+        }
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_rename_path(old_path: String, new_name: String) -> ApiResult<String> {
+pub async fn fs_rename_path(app: AppHandle, old_path: String, new_name: String) -> ApiResult<String> {
+    let from = old_path.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let new_name = safe_entry_name(&new_name)?.to_string();
         let old = PathBuf::from(old_path);
-        let parent = old.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
+        let parent = old
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
         let new_path = parent.join(new_name);
-        fs::rename(&old, &new_path)?;
-        Ok::<_, std::io::Error>(path_string(&new_path))
+        fs::rename(&old, &new_path).map_err(|err| err.to_string())?;
+        Ok::<_, String>(path_string(&new_path))
     })
     .await;
     match result {
-        Ok(Ok(path)) => ok(path),
+        Ok(Ok(path)) => {
+            crate::sync::notify_rename(&app, &from, &path);
+            ok(path)
+        }
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }

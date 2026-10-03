@@ -6,7 +6,9 @@ import { MarkdownEditor, type MarkdownEditorHandle } from './components/Markdown
 import { MarkdownPreview, type MarkdownPreviewHandle } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
 import { IconFolder, IconNewFile, IconNewFolder } from './components/icons'
+import { SyncDialog } from './components/SyncDialog'
 import { Toolbar } from './components/Toolbar'
+import { Whiteboard } from './components/Whiteboard'
 import {
   clampFontSize,
   cssFontFamily,
@@ -29,7 +31,34 @@ function basename(filePath: string) {
 function dirname(filePath: string) {
   const normalized = filePath.replace(/\\/g, '/')
   const index = normalized.lastIndexOf('/')
-  return index === -1 ? normalized : normalized.slice(0, index)
+  if (index <= 0) return index === 0 ? '/' : '.'
+  return normalized.slice(0, index)
+}
+
+function isBoardPath(filePath: string) {
+  return filePath.replace(/\\/g, '/').toLowerCase().endsWith('.board.json')
+}
+
+function isPhoneLayout() {
+  return window.matchMedia('(max-width: 760px)').matches
+}
+
+function joinWorkspacePath(root: string, rel: string) {
+  const relative = rel.replace(/\\/g, '/')
+  if (!root || root === '.') return relative
+  const sep = root.includes('\\') ? '\\' : '/'
+  return `${root.replace(/[/\\]+$/, '')}${sep}${relative.replace(/\//g, sep)}`
+}
+
+function pathsEqual(left: string | null, right: string | null) {
+  if (!left || !right) return false
+  return left.replace(/\\/g, '/').replace(/\/+$/, '') === right.replace(/\\/g, '/').replace(/\/+$/, '')
+}
+
+function isInsidePath(parent: string, child: string) {
+  const base = parent.replace(/\\/g, '/').replace(/\/+$/, '')
+  const next = child.replace(/\\/g, '/')
+  return next === base || next.startsWith(`${base}/`)
 }
 
 function filterTree(entries: FileEntry[], query: string): FileEntry[] {
@@ -51,7 +80,7 @@ function filterTree(entries: FileEntry[], query: string): FileEntry[] {
 }
 
 type NamePrompt =
-  | { kind: 'createFile'; dirPath: string }
+  | { kind: 'createFile'; dirPath: string; board?: boolean }
   | { kind: 'createFolder'; dirPath: string }
   | { kind: 'rename'; entry: FileEntry }
 
@@ -118,7 +147,9 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [, setStatus] = useState('打开一个文件夹开始编辑')
   const [sidebarWidth, setSidebarWidth] = useState(() => readUiPrefs().sidebarWidth)
-  const [sidebarOpen, setSidebarOpen] = useState(() => readUiPrefs().sidebarOpen)
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    isPhoneLayout() ? false : readUiPrefs().sidebarOpen,
+  )
   const [sidebarPeeking, setSidebarPeeking] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   const [splitRatio, setSplitRatio] = useState(() => readUiPrefs().splitRatio)
@@ -149,7 +180,16 @@ export default function App() {
   )
   const confirmUnsavedRef = useRef<() => Promise<boolean>>(async () => true)
   const [leavePrompt, setLeavePrompt] = useState(false)
+  const [isPhone, setIsPhone] = useState(isPhoneLayout)
+  const [remoteName, setRemoteName] = useState<string | null>(
+    () => window.tigermark?.workspaceName ?? null,
+  )
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [syncPeers, setSyncPeers] = useState(0)
+  const [sessionSettled, setSessionSettled] = useState(false)
   const isMac = window.tigermark?.platform === 'darwin'
+  const isRemote = Boolean(window.tigermark?.isRemote)
+  const phoneRef = useRef(isPhone)
 
   contentRef.current = content
   activePathRef.current = activePath
@@ -157,11 +197,23 @@ export default function App() {
   rootPathRef.current = rootPath
   expandedPathsRef.current = expandedPaths
   sidebarOpenRef.current = sidebarOpen
+  phoneRef.current = isPhone
 
   useEffect(() => {
     if (viewMode === 'preview') setFindTarget('preview')
     if (viewMode === 'edit') setFindTarget('editor')
   }, [viewMode])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 760px)')
+    const onChange = () => setIsPhone(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    if (isPhone && viewMode === 'split') setViewMode('edit')
+  }, [isPhone, viewMode])
 
   const filteredTree = useMemo(() => filterTree(tree, fileQuery), [tree, fileQuery])
   const hasFilter = fileQuery.trim().length > 0
@@ -287,6 +339,18 @@ export default function App() {
   )
 
   const openDirectory = useCallback(async () => {
+    if (window.tigermark.isRemote) {
+      const result = await window.tigermark.openDirectory()
+      if (!result.ok || !result.data) {
+        setStatus(result.error ?? '桌面端尚未打开文件夹')
+        return
+      }
+      setRemoteName(window.tigermark.workspaceName ?? null)
+      await refreshTree(result.data)
+      setRootPath(result.data)
+      setStatus(window.tigermark.workspaceName ? `已连接：${window.tigermark.workspaceName}` : '已连接桌面工作区')
+      return
+    }
     if (!(await confirmUnsavedRef.current())) return
     const result = await window.tigermark.openDirectory()
     if (!result.ok) {
@@ -330,6 +394,7 @@ export default function App() {
       setStatus(filePath)
       persistSession({ activePath: filePath })
       if (!sidebarOpenRef.current) setSidebarPeeking(false)
+      if (phoneRef.current) setSidebarOpen(false)
     },
     [persistSession],
   )
@@ -338,13 +403,14 @@ export default function App() {
     const path = activePathRef.current
     if (!path || savingRef.current) return false
     savingRef.current = true
+    const snapshot = contentRef.current
     try {
-      const result = await window.tigermark.writeFile(path, contentRef.current)
+      const result = await window.tigermark.writeFile(path, snapshot)
       if (!result.ok) {
         setStatus(result.error ?? '保存失败')
         return false
       }
-      setDirty(false)
+      if (contentRef.current === snapshot) setDirty(false)
       setStatus(`已保存 · ${basename(path)}`)
       return true
     } finally {
@@ -471,7 +537,10 @@ export default function App() {
 
       if (prompt.kind === 'createFile') {
         if (!(await confirmUnsavedRef.current())) return
-        const result = await window.tigermark.createFile(prompt.dirPath, name)
+        const fileName = prompt.board && !name.toLowerCase().endsWith('.board.json')
+          ? `${name}.board.json`
+          : name
+        const result = await window.tigermark.createFile(prompt.dirPath, fileName)
         if (!result.ok || !result.data) {
           setStatus(result.error ?? '创建文件失败')
           return
@@ -549,18 +618,60 @@ export default function App() {
     [openFile, persistSession, refreshTree, rootPath],
   )
 
+  const loadRemoteWorkspace = useCallback(async () => {
+    const result = await window.tigermark.openDirectory()
+    if (!result.ok || !result.data) {
+      setRootPath(null)
+      setTree([])
+      setActivePath(null)
+      setContent('')
+      setDirty(false)
+      setRemoteName(null)
+      setStatus(result.error ?? '等待桌面端打开文件夹')
+      return
+    }
+    const name = window.tigermark.workspaceName ?? null
+    setRemoteName(name)
+    const entries = await refreshTree(result.data)
+    if (!entries) return
+    setRootPath(result.data)
+    setStatus(name ? `已连接：${name}` : '已连接桌面工作区')
+    const session = readSession()
+    if (session?.rootPath === result.data) {
+      setExpandedPaths(new Set(session.expandedPaths))
+      if (session.activePath && !dirtyRef.current) {
+        const file = await window.tigermark.readFile(session.activePath)
+        if (file.ok && file.data !== undefined) {
+          setActivePath(session.activePath)
+          setContent(file.data)
+          setDirty(false)
+        }
+      }
+    }
+    persistSession({ rootPath: result.data })
+  }, [persistSession, refreshTree])
+
   useEffect(() => {
     if (sessionReadyRef.current) return
     sessionReadyRef.current = true
 
+    if (window.tigermark.isRemote) {
+      void loadRemoteWorkspace().finally(() => setSessionSettled(true))
+      return
+    }
+
     const session = readSession()
-    if (!session) return
+    if (!session) {
+      setSessionSettled(true)
+      return
+    }
 
     void (async () => {
       const entries = await refreshTree(session.rootPath)
       if (!entries) {
         clearSession()
         setStatus('上次打开的目录已失效，请重新选择')
+        setSessionSettled(true)
         return
       }
       setRootPath(session.rootPath)
@@ -582,8 +693,99 @@ export default function App() {
           })
         }
       }
+      setSessionSettled(true)
     })()
-  }, [persistSession, refreshTree])
+  }, [loadRemoteWorkspace, persistSession, refreshTree])
+
+  useEffect(() => {
+    if (!sessionSettled || window.tigermark.isRemote) return
+    void window.tigermark.setSyncWorkspace(rootPath)
+  }, [sessionSettled, rootPath])
+
+  useEffect(() => {
+    if (window.tigermark.isRemote) {
+      setSyncPeers(1)
+      return
+    }
+    let stop = false
+    const tick = async () => {
+      const info = await window.tigermark.getSyncInfo()
+      if (stop || !info) return
+      setSyncPeers((current) => (current === info.clients ? current : info.clients))
+    }
+    void tick()
+    const timer = window.setInterval(() => void tick(), 2000)
+    return () => {
+      stop = true
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!dirty || !activePath) return
+    if (!window.tigermark.isRemote && syncPeers < 1) return
+    const timer = window.setTimeout(() => {
+      void saveFile()
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [dirty, content, activePath, syncPeers, saveFile])
+
+  useEffect(() => {
+    const toAbsolute = (rel: string) => joinWorkspacePath(rootPathRef.current ?? '.', rel)
+    return window.tigermark.onSync((event) => {
+      if (!window.tigermark.isRemote && event.origin === 'desktop') return
+      if (window.tigermark.isRemote && event.origin !== 'desktop' && event.kind !== 'workspace') {
+        const own = sessionStorage.getItem('tigermark.clientId')
+        if (own && event.origin === own) return
+      }
+      if (event.kind === 'workspace') {
+        if (window.tigermark.isRemote) void loadRemoteWorkspace()
+        return
+      }
+      const root = rootPathRef.current
+      if (!root) return
+      if (event.kind === 'tree') {
+        void refreshTree(root)
+        return
+      }
+      if (event.kind === 'delete' && event.path) {
+        const target = toAbsolute(event.path)
+        const active = activePathRef.current
+        if (active && (pathsEqual(active, target) || isInsidePath(target, active))) {
+          setActivePath(null)
+          setContent('')
+          setDirty(false)
+          persistSession({ activePath: null })
+        }
+        void refreshTree(root)
+        return
+      }
+      if (event.kind === 'rename' && event.from && event.path) {
+        const from = toAbsolute(event.from)
+        const next = toAbsolute(event.path)
+        const active = activePathRef.current
+        if (active && pathsEqual(active, from)) {
+          setActivePath(next)
+          persistSession({ activePath: next })
+        } else if (active && isInsidePath(from, active)) {
+          const suffix = active.replace(/\\/g, '/').slice(from.replace(/\\/g, '/').length)
+          const joined = `${next.replace(/\\/g, '/')}${suffix}`
+          const useBackslash = (rootPathRef.current ?? '').includes('\\')
+          const restored = useBackslash ? joined.replace(/\//g, '\\') : joined
+          setActivePath(restored)
+          persistSession({ activePath: restored })
+        }
+        void refreshTree(root)
+        return
+      }
+      if (event.kind === 'write' && event.path && !dirtyRef.current) {
+        const target = toAbsolute(event.path)
+        if (pathsEqual(activePathRef.current, target)) {
+          void openFile(target, { skipUnsavedCheck: true })
+        }
+      }
+    })
+  }, [loadRemoteWorkspace, openFile, persistSession, refreshTree])
 
   useEffect(() => {
     if (!window.tigermark?.onMenuOpenDirectory) return
@@ -750,16 +952,18 @@ export default function App() {
     }, 280)
   }
 
-  const sidebarVisible = sidebarOpen || sidebarPeeking
+  const sidebarVisible = sidebarOpen || (!isPhone && sidebarPeeking)
   const showEditor = viewMode === 'edit' || viewMode === 'split'
   const showPreview = viewMode === 'preview' || viewMode === 'split'
+  const boardActive = Boolean(activePath && isBoardPath(activePath))
+  const folderLabel = rootPath ? remoteName || (rootPath === '.' ? '工作区' : basename(rootPath)) : null
 
   return (
-    <div className={`app${isMac ? ' is-mac' : ''}`}>
+    <div className={`app${isMac ? ' is-mac' : ''}${isPhone ? ' is-phone' : ''}${isRemote ? ' is-remote' : ''}`}>
       <Toolbar
         isMac={isMac}
-        fileName={activePath ? basename(activePath) : null}
-        folderName={rootPath ? basename(rootPath) : null}
+        fileName={activePath ? basename(activePath).replace(/\.board\.json$/i, '') : null}
+        folderName={folderLabel}
         dirty={dirty}
         viewMode={viewMode}
         theme={theme}
@@ -788,20 +992,40 @@ export default function App() {
         onFontChange={setFontFamily}
         fontSize={fontSize}
         onFontSizeChange={(size) => setFontSize(clampFontSize(size))}
+        isPhone={isPhone}
+        isRemote={isRemote}
+        syncPeers={syncPeers}
+        boardActive={boardActive}
+        onNewBoard={() => {
+          if (!rootPath) {
+            setStatus('请先打开文件夹')
+            return
+          }
+          setNamePrompt({ kind: 'createFile', dirPath: rootPath, board: true })
+        }}
+        onOpenSync={() => setSyncOpen(true)}
       />
 
       <div className={`workspace${isResizing ? ' is-resizing' : ''}${sidebarOpen ? '' : ' sidebar-closed'}`}>
-        {!sidebarOpen && (
+        {!sidebarOpen && !isPhone && (
           <div
             className="sidebar-hotzone"
             onMouseEnter={onSidebarEnter}
           />
         )}
+        {isPhone && sidebarOpen && (
+          <button
+            type="button"
+            className="sidebar-backdrop"
+            aria-label="关闭侧边栏"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
         <div
           className={`sidebar-shell${sidebarOpen ? '' : sidebarPeeking ? ' is-overlay' : ' is-collapsed'}`}
-          onMouseEnter={onSidebarEnter}
-          onMouseLeave={onSidebarLeave}
+          onMouseEnter={isPhone ? undefined : onSidebarEnter}
+          onMouseLeave={isPhone ? undefined : onSidebarLeave}
         >
           <aside
             className="sidebar"
@@ -809,7 +1033,7 @@ export default function App() {
           >
             <div className="sidebar-header">
               <span className="sidebar-title">
-                {rootPath ? basename(rootPath) : '未打开目录'}
+                {folderLabel ?? '未打开目录'}
               </span>
               <div className="sidebar-actions">
                 <button
@@ -848,7 +1072,9 @@ export default function App() {
                 className="sidebar-search-input"
                 type="search"
                 value={fileQuery}
-                placeholder={isMac ? '搜索文件… ⌘P' : '搜索文件… Ctrl+P'}
+                placeholder={
+                  isPhone ? '搜索文件' : isMac ? '搜索文件… ⌘P' : '搜索文件… Ctrl+P'
+                }
                 aria-label="搜索文件"
                 onChange={(e) => setFileQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -875,7 +1101,9 @@ export default function App() {
                   onDelete={deleteEntry}
                   onRename={renameEntry}
                   onReveal={(entry) => void revealInFolder(entry)}
-                  revealLabel={revealInFolderLabel(window.tigermark?.platform ?? '')}
+                  revealLabel={
+                    isRemote ? '' : revealInFolderLabel(window.tigermark?.platform ?? '')
+                  }
                   expandedPaths={expandedPaths}
                   onToggleExpand={toggleExpand}
                   expandAll={hasFilter}
@@ -883,9 +1111,9 @@ export default function App() {
               )
             ) : (
               <div className="empty-sidebar">
-                <p>打开本地文件夹</p>
+                <p>{isRemote ? '等待桌面端打开文件夹' : '打开本地文件夹'}</p>
                 <button type="button" className="primary-btn" onClick={() => void openDirectory()}>
-                  选择目录
+                  {isRemote ? '重新连接' : '选择目录'}
                 </button>
               </div>
             )}
@@ -912,7 +1140,15 @@ export default function App() {
             if (!sidebarOpen) setSidebarPeeking(false)
           }}
         >
-          {activePath ? (
+          {activePath && boardActive ? (
+            <Whiteboard
+              key={activePath}
+              value={content}
+              theme={resolvedTheme}
+              readOnly={isPhone || isRemote}
+              onChange={handleContentChange}
+            />
+          ) : activePath ? (
             <div
               ref={panesRef}
               className={`panes panes-${viewMode}${isSplitResizing ? ' is-resizing' : ''}`}
@@ -967,7 +1203,12 @@ export default function App() {
           ) : (
             <div className="empty-editor">
               <h1>TigerMark</h1>
-              <p>左侧打开目录，选择 Markdown 文件开始写作</p>
+              <p>
+                {isRemote
+                  ? '连接桌面端后，在这里查看和编辑同一份笔记'
+                  : '左侧打开目录，选择 Markdown 文件开始写作'}
+              </p>
+              {!isPhone && !isRemote && (
               <div className="hint-row">
                 <kbd>⌘/Ctrl</kbd>+<kbd>B</kbd> 侧边栏
                 <span>·</span>
@@ -979,6 +1220,7 @@ export default function App() {
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>1/2/3</kbd> 切换视图
               </div>
+              )}
             </div>
           )}
         </main>
@@ -986,9 +1228,9 @@ export default function App() {
 
       {namePrompt?.kind === 'createFile' && (
         <NameDialog
-          title="新建文件"
-          label="文件名（可省略 .md）"
-          defaultValue="untitled"
+          title={namePrompt.board ? '新建白板' : '新建文件'}
+          label={namePrompt.board ? '白板名称' : '文件名（可省略 .md）'}
+          defaultValue={namePrompt.board ? '白板' : 'untitled'}
           confirmLabel="创建"
           onConfirm={(name) => void handleNameConfirm(namePrompt, name)}
           onCancel={() => setNamePrompt(null)}
@@ -1014,6 +1256,7 @@ export default function App() {
           onCancel={() => setNamePrompt(null)}
         />
       )}
+      {syncOpen && <SyncDialog onClose={() => setSyncOpen(false)} />}
       {leavePrompt && (
         <ConfirmLeaveDialog
           fileName={activePath ? basename(activePath) : '未命名文件'}

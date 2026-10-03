@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { ApiResult, FileEntry, SavedImage, TigerMarkApi } from '../vite-env'
+import type { ApiResult, FileEntry, SavedImage, SyncInfo, TigerMarkApi } from '../vite-env'
 
 function onEvent<T>(event: string, cb: (payload: T) => void): () => void {
   let disposed = false
@@ -64,6 +64,12 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
       void invoke('app_quit')
     },
     setNativeTheme: (theme) => invoke('theme_set', { theme }),
+    isRemote: false,
+    getSyncInfo: () => invoke<SyncInfo>('sync_info').catch(() => null),
+    setSyncWorkspace: async (path) => {
+      await invoke('sync_set_workspace', { path })
+    },
+    onSync: (cb) => onEvent('sync:event', cb),
   }
 }
 

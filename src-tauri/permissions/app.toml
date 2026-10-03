@@ -20,4 +20,6 @@ commands.allow = [
   "window_close_deny",
   "window_hide",
   "app_quit",
+  "sync_info",
+  "sync_set_workspace",
 ]

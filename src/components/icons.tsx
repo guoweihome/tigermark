@@ -90,6 +90,25 @@ export function IconNewFile() {
   )
 }
 
+export function IconBoard() {
+  return (
+    <svg {...iconProps}>
+      <rect x="2.25" y="2.75" width="11.5" height="10.5" rx="1.2" />
+      <path d="M4.5 10.2c1.4-2.1 2.2-2.1 3.2-.4 1 1.6 1.6 1.6 2.8-.6" />
+    </svg>
+  )
+}
+
+export function IconSync() {
+  return (
+    <svg {...iconProps}>
+      <path d="M4.2 6.2A3.8 3.8 0 0 1 11.6 5.2" />
+      <path d="M11.8 9.8A3.8 3.8 0 0 1 4.4 10.8" />
+      <path d="M10.2 3.6 11.7 5.2 10 6.4M5.8 12.4 4.3 10.8 6 9.6" />
+    </svg>
+  )
+}
+
 export function IconNewFolder() {
   return (
     <svg {...iconProps}>

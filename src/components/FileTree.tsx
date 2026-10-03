@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FileEntry } from '../vite-env'
-import { IconFile, IconFolder } from './icons'
+import { IconBoard, IconFile, IconFolder } from './icons'
 
 interface FileTreeProps {
   entries: FileEntry[]
@@ -130,7 +130,7 @@ function TreeNode({
       >
         <span className="chevron spacer" />
         <span className="node-icon file">
-          <IconFile />
+          {entry.name.toLowerCase().endsWith('.board.json') ? <IconBoard /> : <IconFile />}
         </span>
         <span className="node-name">{entry.name}</span>
         <button
@@ -150,7 +150,9 @@ function TreeNode({
         <ContextMenu
           onClose={() => setMenuOpen(false)}
           actions={[
-            { label: revealLabel, onClick: () => onReveal(entry) },
+            ...(revealLabel
+              ? [{ label: revealLabel, onClick: () => onReveal(entry) }]
+              : []),
             { label: '重命名', onClick: () => onRename(entry) },
             { label: '删除', onClick: () => onDelete(entry), danger: true },
           ]}

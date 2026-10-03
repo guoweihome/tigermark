@@ -9,6 +9,7 @@ import {
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect, useState, type MouseEvent } from 'react'
 import {
+  IconBoard,
   IconFolder,
   IconMonitor,
   IconMoon,
@@ -16,6 +17,7 @@ import {
   IconSave,
   IconSidebar,
   IconSun,
+  IconSync,
 } from './icons'
 
 interface ToolbarProps {
@@ -38,6 +40,12 @@ interface ToolbarProps {
   onFontChange: (font: string) => void
   fontSize: number
   onFontSizeChange: (size: number) => void
+  isPhone: boolean
+  isRemote: boolean
+  syncPeers: number
+  boardActive: boolean
+  onNewBoard: () => void
+  onOpenSync: () => void
 }
 
 const THEME_CYCLE: ThemePreference[] = ['light', 'dark', 'system']
@@ -73,6 +81,12 @@ export function Toolbar({
   onFontChange,
   fontSize,
   onFontSizeChange,
+  isPhone,
+  isRemote,
+  syncPeers,
+  boardActive,
+  onNewBoard,
+  onOpenSync,
 }: ToolbarProps) {
   const [fonts, setFonts] = useState<string[]>(() => {
     const presets: string[] = [...PRESET_FONTS]
@@ -132,6 +146,11 @@ export function Toolbar({
         <button type="button" className="titlebar-btn" title="新建文件" onClick={onNewFile}>
           <IconPlus />
         </button>
+        {!isPhone && !isRemote && (
+          <button type="button" className="titlebar-btn" title="新建白板" onClick={onNewBoard}>
+            <IconBoard />
+          </button>
+        )}
       </div>
 
       <div className="toolbar-center">
@@ -168,6 +187,7 @@ export function Toolbar({
           <IconSave />
         </button>
 
+        {!boardActive && (
         <div className="view-toggle" role="group" aria-label="视图模式">
           {(
             [
@@ -179,6 +199,7 @@ export function Toolbar({
             <button
               key={mode}
               type="button"
+              data-mode={mode}
               className={viewMode === mode ? 'active' : ''}
               onClick={() => onViewModeChange(mode)}
             >
@@ -186,7 +207,10 @@ export function Toolbar({
             </button>
           ))}
         </div>
+        )}
 
+        {!boardActive && (
+        <>
         <label className="font-select-wrap" title="编辑与预览字体">
           <select
             className="font-select"
@@ -225,6 +249,19 @@ export function Toolbar({
             A+
           </button>
         </div>
+        </>
+        )}
+
+        {!isRemote && (
+          <button
+            type="button"
+            className={`titlebar-btn${syncPeers > 0 ? ' accent' : ''}`}
+            title={syncPeers > 0 ? `局域网同步（${syncPeers} 台设备）` : '局域网同步'}
+            onClick={onOpenSync}
+          >
+            <IconSync />
+          </button>
+        )}
 
         <button
           type="button"

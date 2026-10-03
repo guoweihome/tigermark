@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { Compartment, EditorState } from '@codemirror/state'
+import { Compartment, EditorState, Transaction } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { bracketMatching } from '@codemirror/language'
@@ -59,9 +59,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     if (!hostRef.current) return
 
     const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        onChangeRef.current(update.state.doc.toString())
-      }
+      if (!update.docChanged) return
+      const external = update.transactions.every(
+        (tr) => tr.annotation(Transaction.addToHistory) === false,
+      )
+      if (!external) onChangeRef.current(update.state.doc.toString())
     })
 
     const pasteHandler = EditorView.domEventHandlers({
@@ -133,6 +135,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     if (current !== value) {
       view.dispatch({
         changes: { from: 0, to: current.length, insert: value },
+        annotations: Transaction.addToHistory.of(false),
       })
     }
   }, [value])

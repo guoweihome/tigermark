@@ -20,6 +20,24 @@ export interface SavedImage {
 
 export type ViewMode = 'edit' | 'split' | 'preview'
 
+export interface SyncEvent {
+  kind: string
+  path?: string
+  from?: string
+  name?: string
+  origin: string
+}
+
+export interface SyncInfo {
+  port: number
+  token: string
+  host: string
+  pageUrl: string
+  clients: number
+  workspaceOpen: boolean
+  error?: string
+}
+
 export interface TigerMarkApi {
   openDirectory: () => Promise<ApiResult<string | null>>
   readDirectory: (dirPath: string) => Promise<ApiResult<FileEntry[]>>
@@ -50,6 +68,11 @@ export interface TigerMarkApi {
   hideWindow: () => void
   quit: () => void
   setNativeTheme: (theme: 'light' | 'dark' | 'system') => Promise<void>
+  isRemote: boolean
+  workspaceName?: string
+  getSyncInfo: () => Promise<SyncInfo | null>
+  setSyncWorkspace: (path: string | null) => Promise<void>
+  onSync: (cb: (event: SyncEvent) => void) => () => void
 }
 
 interface QueryLocalFont {
