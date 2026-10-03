@@ -145,7 +145,13 @@ export default function App() {
   const [content, setContent] = useState('')
   const [dirty, setDirty] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('split')
-  const [, setStatus] = useState('打开一个文件夹开始编辑')
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
+  const setStatus = useCallback((text: string) => setToast({ text, id: Date.now() }), [])
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 2800)
+    return () => window.clearTimeout(timer)
+  }, [toast])
   const [sidebarWidth, setSidebarWidth] = useState(() => readUiPrefs().sidebarWidth)
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     isPhoneLayout() ? false : readUiPrefs().sidebarOpen,
@@ -391,7 +397,6 @@ export default function App() {
       setActivePath(filePath)
       setContent(result.data)
       setDirty(false)
-      setStatus(filePath)
       persistSession({ activePath: filePath })
       if (!sidebarOpenRef.current) setSidebarPeeking(false)
       if (phoneRef.current) setSidebarOpen(false)
@@ -676,7 +681,6 @@ export default function App() {
       }
       setRootPath(session.rootPath)
       setExpandedPaths(new Set(session.expandedPaths))
-      setStatus(`已打开：${session.rootPath}`)
 
       if (session.activePath) {
         const result = await window.tigermark.readFile(session.activePath)
@@ -684,7 +688,6 @@ export default function App() {
           setActivePath(session.activePath)
           setContent(result.data)
           setDirty(false)
-          setStatus(session.activePath)
         } else {
           persistSession({
             rootPath: session.rootPath,
@@ -1264,6 +1267,11 @@ export default function App() {
           onDiscard={() => resolveLeave('discard')}
           onCancel={() => resolveLeave('cancel')}
         />
+      )}
+      {toast && (
+        <div key={toast.id} className="toast" role="status">
+          {toast.text}
+        </div>
       )}
     </div>
   )

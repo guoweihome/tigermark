@@ -1590,3 +1590,28 @@ kbd {
 .app.is-phone .hint-row {
   gap: 6px;
 }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 60;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: toast-in 160ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}

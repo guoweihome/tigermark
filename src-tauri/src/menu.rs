@@ -2,6 +2,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::commands::{open_website, show_about};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::updater::check_for_updates;
 
 pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -148,6 +149,7 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         "website" => open_website(app),
         "about" => show_about(app),
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         "check-updates" => check_for_updates(app.clone(), true),
         _ => {}
     }

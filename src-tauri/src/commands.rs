@@ -235,28 +235,60 @@ pub fn get_platform() -> String {
         "darwin".into()
     } else if cfg!(target_os = "windows") {
         "win32".into()
+    } else if cfg!(target_os = "android") {
+        "android".into()
     } else {
         "linux".into()
     }
 }
 
+#[cfg(not(desktop))]
+fn mobile_workspace(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .document_dir()
+        .map_err(|err| err.to_string())?
+        .join("TigerMark");
+    fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
+    let is_empty = fs::read_dir(&dir)
+        .map_err(|err| err.to_string())?
+        .next()
+        .is_none();
+    if is_empty {
+        fs::write(dir.join("欢迎.md"), initial_file_content("欢迎.md"))
+            .map_err(|err| err.to_string())?;
+    }
+    Ok(dir)
+}
+
 #[tauri::command]
 pub async fn dialog_open_directory(app: AppHandle) -> ApiResult<Option<String>> {
-    let picked = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
-            .file()
-            .set_title("选择工作目录")
-            .blocking_pick_folder()
-    })
-    .await;
-
-    match picked {
-        Ok(Some(folder)) => match folder.into_path() {
+    #[cfg(not(desktop))]
+    {
+        return match mobile_workspace(&app) {
             Ok(path) => ok(Some(path_string(&path))),
             Err(err) => fail(err),
-        },
-        Ok(None) => ok(None),
-        Err(err) => fail(err),
+        };
+    }
+
+    #[cfg(desktop)]
+    {
+        let picked = tauri::async_runtime::spawn_blocking(move || {
+            app.dialog()
+                .file()
+                .set_title("选择工作目录")
+                .blocking_pick_folder()
+        })
+        .await;
+
+        match picked {
+            Ok(Some(folder)) => match folder.into_path() {
+                Ok(path) => ok(Some(path_string(&path))),
+                Err(err) => fail(err),
+            },
+            Ok(None) => ok(None),
+            Err(err) => fail(err),
+        }
     }
 }
 

@@ -1,6 +1,8 @@
 mod commands;
+#[cfg(desktop)]
 mod menu;
 mod sync;
+#[cfg(desktop)]
 mod updater;
 
 use commands::CloseState;
@@ -11,11 +13,15 @@ use std::sync::atomic::Ordering;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    let builder = builder
         .manage(CloseState::default())
         .invoke_handler(tauri::generate_handler![
             commands::get_platform,
@@ -40,15 +46,22 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             app.manage(sync::start(handle));
-            let handle = app.handle();
-            let menu = menu::build_menu(handle)?;
-            app.set_menu(menu)?;
-            updater::setup_auto_updater(handle.clone());
+            #[cfg(desktop)]
+            {
+                let handle = app.handle();
+                let menu = menu::build_menu(handle)?;
+                app.set_menu(menu)?;
+                updater::setup_auto_updater(handle.clone());
+            }
             Ok(())
-        })
-        .on_menu_event(|app, event| {
-            menu::handle_menu_event(app, event.id().as_ref());
-        })
+        });
+
+    #[cfg(desktop)]
+    let builder = builder.on_menu_event(|app, event| {
+        menu::handle_menu_event(app, event.id().as_ref());
+    });
+
+    builder
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 #[cfg(target_os = "macos")]
