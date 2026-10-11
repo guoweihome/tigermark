@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
@@ -107,12 +105,5 @@ pub fn check_for_updates(app: AppHandle, from_menu: bool) {
                 }
             }
         }
-    });
-}
-
-pub fn setup_auto_updater(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        check_for_updates(app, false);
     });
 }

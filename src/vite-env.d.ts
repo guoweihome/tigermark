@@ -34,8 +34,23 @@ export interface SyncInfo {
   host: string
   pageUrl: string
   clients: number
+  sharing: boolean
   workspaceOpen: boolean
   error?: string
+}
+
+export interface DiscoveredPeer {
+  host: string
+  port: number
+  token: string
+  name: string
+}
+
+export interface FollowReport {
+  following: boolean
+  pulled: boolean
+  files: number
+  name: string
 }
 
 export interface TigerMarkApi {
@@ -72,6 +87,9 @@ export interface TigerMarkApi {
   workspaceName?: string
   getSyncInfo: () => Promise<SyncInfo | null>
   setSyncWorkspace: (path: string | null) => Promise<void>
+  setSyncSharing: (enabled: boolean) => Promise<void>
+  discoverSync: () => Promise<DiscoveredPeer[]>
+  followSync: (peer: DiscoveredPeer) => Promise<ApiResult<FollowReport>>
   onSync: (cb: (event: SyncEvent) => void) => () => void
 }
 

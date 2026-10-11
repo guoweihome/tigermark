@@ -1,6 +1,14 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { ApiResult, FileEntry, SavedImage, SyncInfo, TigerMarkApi } from '../vite-env'
+import type {
+  ApiResult,
+  DiscoveredPeer,
+  FileEntry,
+  FollowReport,
+  SavedImage,
+  SyncInfo,
+  TigerMarkApi,
+} from '../vite-env'
 
 function onEvent<T>(event: string, cb: (payload: T) => void): () => void {
   let disposed = false
@@ -68,6 +76,26 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
     getSyncInfo: () => invoke<SyncInfo>('sync_info').catch(() => null),
     setSyncWorkspace: async (path) => {
       await invoke('sync_set_workspace', { path })
+    },
+    setSyncSharing: (enabled) => invoke('sync_set_sharing', { enabled }),
+    discoverSync: () => invoke<DiscoveredPeer[]>('sync_discover').catch(() => []),
+    followSync: async (peer) => {
+      try {
+        const data = await invoke<FollowReport>('sync_follow', {
+          host: peer.host,
+          port: peer.port,
+          token: peer.token,
+        })
+        return { ok: true, data }
+      } catch (err) {
+        const error =
+          typeof err === 'string'
+            ? err
+            : err instanceof Error
+              ? err.message
+              : '同步失败'
+        return { ok: false, error }
+      }
     },
     onSync: (cb) => onEvent('sync:event', cb),
   }

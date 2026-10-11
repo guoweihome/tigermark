@@ -40,7 +40,6 @@ interface ToolbarProps {
   onFontChange: (font: string) => void
   fontSize: number
   onFontSizeChange: (size: number) => void
-  isPhone: boolean
   isRemote: boolean
   syncPeers: number
   boardActive: boolean
@@ -81,7 +80,6 @@ export function Toolbar({
   onFontChange,
   fontSize,
   onFontSizeChange,
-  isPhone,
   isRemote,
   syncPeers,
   boardActive,
@@ -146,11 +144,9 @@ export function Toolbar({
         <button type="button" className="titlebar-btn" title="新建文件" onClick={onNewFile}>
           <IconPlus />
         </button>
-        {!isPhone && !isRemote && (
-          <button type="button" className="titlebar-btn" title="新建白板" onClick={onNewBoard}>
-            <IconBoard />
-          </button>
-        )}
+        <button type="button" className="titlebar-btn" title="新建白板" onClick={onNewBoard}>
+          <IconBoard />
+        </button>
       </div>
 
       <div className="toolbar-center">

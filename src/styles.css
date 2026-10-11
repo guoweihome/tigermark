@@ -1460,6 +1460,8 @@ kbd {
   display: grid;
   place-items: center;
   padding: 16px;
+  overflow: hidden;
+  touch-action: none;
   background:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
@@ -1468,15 +1470,13 @@ kbd {
 }
 
 .whiteboard-stage canvas {
-  width: min(100%, 960px);
-  height: auto;
-  max-height: 100%;
-  aspect-ratio: 16 / 10;
+  display: block;
   background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(28, 36, 48, 0.08);
   touch-action: none;
   cursor: crosshair;
+  -webkit-app-region: no-drag;
 }
 
 .whiteboard-stage.is-dark canvas {

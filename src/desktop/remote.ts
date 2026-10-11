@@ -138,9 +138,13 @@ export function createRemoteApi(token: string): TigerMarkApi {
       host: location.hostname,
       pageUrl: location.href,
       clients: 1,
+      sharing: false,
       workspaceOpen: true,
     }),
     setSyncWorkspace: async () => {},
+    setSyncSharing: async () => {},
+    discoverSync: async () => [],
+    followSync: async () => ({ ok: false, error: '手机浏览器直接查看电脑上的笔记' }),
     onSync: (cb) => {
       let closed = false
       let source: EventSource | null = null

@@ -13,8 +13,13 @@ interface Stroke {
   points: Point[]
 }
 
-const COLORS = ['#12181f', '#c45c26', '#3d6e9e', '#2f7d4f', '#b42318', '#e6b325']
+const LIGHT_COLORS = ['#12181f', '#c45c26', '#3d6e9e', '#2f7d4f', '#b42318', '#e6b325']
+const DARK_COLORS = ['#f4f1ea', '#e08a4f', '#8eb6e0', '#7dcea0', '#f07178', '#e6b325']
 const WIDTHS = [2, 4, 8]
+
+function paletteFor(theme: 'light' | 'dark') {
+  return theme === 'dark' ? DARK_COLORS : LIGHT_COLORS
+}
 
 function isPoint(value: unknown): value is Point {
   return (
@@ -115,9 +120,14 @@ export function Whiteboard({ value, theme, readOnly = false, onChange }: Whitebo
   const [redo, setRedo] = useState<Stroke[]>([])
   const [draft, setDraft] = useState<Stroke | null>(null)
   const [tool, setTool] = useState<Tool>('pen')
-  const [color, setColor] = useState(COLORS[0])
+  const [color, setColor] = useState(() => paletteFor(theme)[0])
   const [width, setWidth] = useState(4)
   const drawingRef = useRef<Stroke | null>(null)
+  const colors = paletteFor(theme)
+
+  useEffect(() => {
+    setColor((current) => (paletteFor(theme).includes(current) ? current : paletteFor(theme)[0]))
+  }, [theme])
 
   useEffect(() => {
     if (value === emittedRef.current) return
@@ -129,18 +139,44 @@ export function Whiteboard({ value, theme, readOnly = false, onChange }: Whitebo
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    canvas.width = BOARD_W * dpr
-    canvas.height = BOARD_H * dpr
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, BOARD_W, BOARD_H)
-    ctx.fillStyle = theme === 'dark' ? '#1c2025' : '#ffffff'
-    ctx.fillRect(0, 0, BOARD_W, BOARD_H)
-    for (const stroke of strokes) drawStroke(ctx, stroke)
-    if (draft) drawStroke(ctx, draft)
+    const stage = canvas?.parentElement
+    if (!canvas || !stage) return
+
+    const paint = () => {
+      const rect = stage.getBoundingClientRect()
+      const availW = Math.max(1, rect.width - 32)
+      const availH = Math.max(1, rect.height - 32)
+      const ratio = BOARD_W / BOARD_H
+      let cssWidth = availW
+      let cssHeight = cssWidth / ratio
+      if (cssHeight > availH) {
+        cssHeight = availH
+        cssWidth = cssHeight * ratio
+      }
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      const bitmapW = Math.max(1, Math.round(cssWidth * dpr))
+      const bitmapH = Math.max(1, Math.round(cssHeight * dpr))
+      canvas.style.width = `${cssWidth}px`
+      canvas.style.height = `${cssHeight}px`
+      if (canvas.width !== bitmapW || canvas.height !== bitmapH) {
+        canvas.width = bitmapW
+        canvas.height = bitmapH
+      }
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      const scale = cssWidth / BOARD_W
+      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0)
+      ctx.clearRect(0, 0, BOARD_W, BOARD_H)
+      ctx.fillStyle = theme === 'dark' ? '#1c2025' : '#ffffff'
+      ctx.fillRect(0, 0, BOARD_W, BOARD_H)
+      for (const stroke of strokes) drawStroke(ctx, stroke)
+      if (draft) drawStroke(ctx, draft)
+    }
+
+    paint()
+    const observer = new ResizeObserver(() => paint())
+    observer.observe(stage)
+    return () => observer.disconnect()
   }, [strokes, draft, theme])
 
   const commit = (next: Stroke[], nextRedo: Stroke[]) => {
@@ -153,13 +189,16 @@ export function Whiteboard({ value, theme, readOnly = false, onChange }: Whitebo
 
   const pointFromEvent = (event: ReactPointerEvent<HTMLCanvasElement>): Point => {
     const rect = event.currentTarget.getBoundingClientRect()
-    const x = ((event.clientX - rect.left) / rect.width) * BOARD_W
-    const y = ((event.clientY - rect.top) / rect.height) * BOARD_H
+    const width = rect.width || 1
+    const height = rect.height || 1
+    const x = ((event.clientX - rect.left) / width) * BOARD_W
+    const y = ((event.clientY - rect.top) / height) * BOARD_H
     return [Math.round(x * 10) / 10, Math.round(y * 10) / 10]
   }
 
   const onPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (readOnly) return
+    event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     const stroke: Stroke = {
       tool,
@@ -229,7 +268,7 @@ export function Whiteboard({ value, theme, readOnly = false, onChange }: Whitebo
     >
       <div className="whiteboard-toolbar">
         {readOnly ? (
-          <span className="whiteboard-hint">白板在桌面端编辑，这里同步显示</span>
+          <span className="whiteboard-hint">当前只能查看这块白板</span>
         ) : (
           <>
             {(
@@ -251,7 +290,7 @@ export function Whiteboard({ value, theme, readOnly = false, onChange }: Whitebo
               </button>
             ))}
             <span className="whiteboard-sep" />
-            {COLORS.map((item) => (
+            {colors.map((item) => (
               <button
                 key={item}
                 type="button"

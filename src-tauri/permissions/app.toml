@@ -22,4 +22,7 @@ commands.allow = [
   "app_quit",
   "sync_info",
   "sync_set_workspace",
+  "sync_set_sharing",
+  "sync_discover",
+  "sync_follow",
 ]

@@ -42,6 +42,9 @@ pub fn run() {
             commands::app_quit,
             sync::sync_info,
             sync::sync_set_workspace,
+            sync::sync_set_sharing,
+            sync::sync_discover,
+            sync::sync_follow,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -51,7 +54,6 @@ pub fn run() {
                 let handle = app.handle();
                 let menu = menu::build_menu(handle)?;
                 app.set_menu(menu)?;
-                updater::setup_auto_updater(handle.clone());
             }
             Ok(())
         });

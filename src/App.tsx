@@ -192,6 +192,7 @@ export default function App() {
   )
   const [syncOpen, setSyncOpen] = useState(false)
   const [syncPeers, setSyncPeers] = useState(0)
+  const [linked, setLinked] = useState(false)
   const [sessionSettled, setSessionSettled] = useState(false)
   const isMac = window.tigermark?.platform === 'darwin'
   const isRemote = Boolean(window.tigermark?.isRemote)
@@ -367,6 +368,7 @@ export default function App() {
     const entries = await refreshTree(result.data)
     const nextExpanded = new Set(entries ? topLevelDirPaths(entries) : [])
     setRootPath(result.data)
+    rootPathRef.current = result.data
     setActivePath(null)
     setContent('')
     setDirty(false)
@@ -726,12 +728,12 @@ export default function App() {
 
   useEffect(() => {
     if (!dirty || !activePath) return
-    if (!window.tigermark.isRemote && syncPeers < 1) return
+    if (!window.tigermark.isRemote && syncPeers < 1 && !linked) return
     const timer = window.setTimeout(() => {
       void saveFile()
     }, 1000)
     return () => window.clearTimeout(timer)
-  }, [dirty, content, activePath, syncPeers, saveFile])
+  }, [dirty, content, activePath, syncPeers, linked, saveFile])
 
   useEffect(() => {
     const toAbsolute = (rel: string) => joinWorkspacePath(rootPathRef.current ?? '.', rel)
@@ -740,6 +742,16 @@ export default function App() {
       if (window.tigermark.isRemote && event.origin !== 'desktop' && event.kind !== 'workspace') {
         const own = sessionStorage.getItem('tigermark.clientId')
         if (own && event.origin === own) return
+      }
+      if (event.kind === 'reload') {
+        const root = rootPathRef.current
+        if (!root) return
+        void (async () => {
+          await refreshTree(root)
+          const active = activePathRef.current
+          if (active) await openFile(active, { skipUnsavedCheck: true })
+        })()
+        return
       }
       if (event.kind === 'workspace') {
         if (window.tigermark.isRemote) void loadRemoteWorkspace()
@@ -789,6 +801,59 @@ export default function App() {
       }
     })
   }, [loadRemoteWorkspace, openFile, persistSession, refreshTree])
+
+  useEffect(() => {
+    if (!sessionSettled || window.tigermark.isRemote) return
+    let stop = false
+    let busy = false
+    let lastError = ''
+    const tick = async () => {
+      if (stop || busy) return
+      const info = await window.tigermark.getSyncInfo()
+      if (stop) return
+      if (!info || info.sharing) {
+        setLinked(false)
+        return
+      }
+      if (!rootPathRef.current && window.tigermark.platform === 'android') {
+        await openDirectory()
+      }
+      const root = rootPathRef.current
+      if (!root) return
+      const peers = await window.tigermark.discoverSync()
+      const peer = peers[0]
+      if (!peer) return
+      busy = true
+      try {
+        await window.tigermark.setSyncWorkspace(root)
+        const result = await window.tigermark.followSync(peer)
+        if (stop) return
+        if (!result.ok || !result.data) {
+          const message = result.error ?? '同步失败'
+          if (message !== lastError) {
+            lastError = message
+            setStatus(message)
+          }
+          setLinked(false)
+          return
+        }
+        lastError = ''
+        setLinked(true)
+        if (result.data.pulled) {
+          const from = result.data.name || peer.name
+          setStatus(from ? `已从「${from}」同步 ${result.data.files} 个文件` : '已同步笔记')
+        }
+      } finally {
+        busy = false
+      }
+    }
+    void tick()
+    const timer = window.setInterval(() => void tick(), 2000)
+    return () => {
+      stop = true
+      window.clearInterval(timer)
+    }
+  }, [openDirectory, sessionSettled, setStatus])
 
   useEffect(() => {
     if (!window.tigermark?.onMenuOpenDirectory) return
@@ -995,7 +1060,6 @@ export default function App() {
         onFontChange={setFontFamily}
         fontSize={fontSize}
         onFontSizeChange={(size) => setFontSize(clampFontSize(size))}
-        isPhone={isPhone}
         isRemote={isRemote}
         syncPeers={syncPeers}
         boardActive={boardActive}
@@ -1148,7 +1212,6 @@ export default function App() {
               key={activePath}
               value={content}
               theme={resolvedTheme}
-              readOnly={isPhone || isRemote}
               onChange={handleContentChange}
             />
           ) : activePath ? (
