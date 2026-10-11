@@ -42,6 +42,13 @@ function resolveLocalPath(baseDir: string, href: string) {
   return parts.join('/')
 }
 
+function externalHref(href: string) {
+  const value = href.trim()
+  if (/^(https?:|mailto:)/i.test(value)) return value
+  if (value.startsWith('//')) return `https:${value}`
+  return null
+}
+
 function toPreviewSrc(href: string | null | undefined, baseDir?: string | null) {
   if (!href) return ''
   if (isRemoteOrData(href)) return href
@@ -123,6 +130,13 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
 
     const html = useMemo(() => {
       const renderer = new Renderer()
+      renderer.link = function ({ href, title, tokens }) {
+        const text = this.parser.parseInline(tokens)
+        const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
+        const external = externalHref(href)
+        const extra = external ? ' target="_blank" rel="noopener noreferrer"' : ''
+        return `<a href="${escapeAttr(href)}"${titleAttr}${extra}>${text}</a>`
+      }
       renderer.image = ({ href, title, text }) => {
         const src = toPreviewSrc(href, baseDir)
         const alt = escapeAttr(text || '')
@@ -258,6 +272,17 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           ref={articleRef}
           className="markdown-body"
           dangerouslySetInnerHTML={{ __html: html }}
+          onClick={(event) => {
+            if (event.defaultPrevented) return
+            if (!(event.target instanceof Element)) return
+            const anchor = event.target.closest('a')
+            if (!anchor) return
+            const href = anchor.getAttribute('href')
+            if (!href || href.startsWith('#')) return
+            event.preventDefault()
+            const external = externalHref(href)
+            if (external) void window.tigermark.openExternalUrl(external)
+          }}
         />
       </div>
     )

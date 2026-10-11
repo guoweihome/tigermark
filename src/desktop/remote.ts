@@ -118,6 +118,9 @@ export function createRemoteApi(token: string): TigerMarkApi {
     },
     platform,
     showItemInFolder: async () => ({ ok: false, error: '手机端不能打开电脑上的文件夹' }),
+    openExternalUrl: async (url) => {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    },
     onMenuOpenDirectory: () => () => {},
     onMenuSave: () => () => {},
     onMenuViewMode: () => () => {},

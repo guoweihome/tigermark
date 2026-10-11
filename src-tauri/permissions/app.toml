@@ -15,6 +15,7 @@ commands.allow = [
   "fs_rename_path",
   "fs_save_image",
   "shell_show_item_in_folder",
+  "open_external_url",
   "theme_set",
   "window_close_allow",
   "window_close_deny",

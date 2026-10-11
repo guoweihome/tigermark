@@ -524,3 +524,25 @@ pub fn show_about(app: &AppHandle) {
 pub fn open_website(app: &AppHandle) {
     let _ = app.opener().open_url(SITE_URL, None::<&str>);
 }
+
+#[tauri::command]
+pub fn open_external_url(app: AppHandle, url: String) -> ApiResult<()> {
+    let url = url.trim();
+    if url.is_empty()
+        || url.len() > 8_000
+        || url.chars().any(|ch| ch.is_control() || ch.is_whitespace())
+    {
+        return fail("链接无效");
+    }
+    let lower = url.to_ascii_lowercase();
+    let allowed = lower.starts_with("https://")
+        || lower.starts_with("http://")
+        || lower.starts_with("mailto:");
+    if !allowed {
+        return fail("只能用浏览器打开网页链接");
+    }
+    match app.opener().open_url(url, None::<&str>) {
+        Ok(()) => ok(()),
+        Err(err) => fail(err),
+    }
+}

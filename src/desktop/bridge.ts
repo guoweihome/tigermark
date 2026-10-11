@@ -51,6 +51,12 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
     platform,
     showItemInFolder: (targetPath) =>
       invoke<ApiResult<void>>('shell_show_item_in_folder', { targetPath }),
+    openExternalUrl: async (url) => {
+      const result = await invoke<ApiResult<void>>('open_external_url', { url })
+      if (!result.ok) {
+        throw new Error(result.error ?? '无法打开链接')
+      }
+    },
     onMenuOpenDirectory: (cb) => onEvent('menu:open-directory', () => cb()),
     onMenuSave: (cb) => onEvent('menu:save', () => cb()),
     onMenuViewMode: (cb) => onEvent<string>('menu:view-mode', cb),

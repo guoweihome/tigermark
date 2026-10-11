@@ -6,17 +6,46 @@ mod sync;
 mod updater;
 
 use commands::CloseState;
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Emitter, Manager, Runtime, Url, Webview, WindowEvent};
+use tauri_plugin_opener::OpenerExt;
 
 #[cfg(not(target_os = "macos"))]
 use std::sync::atomic::Ordering;
+
+fn is_app_navigation(url: &Url) -> bool {
+    match url.scheme() {
+        "tauri" | "asset" | "ipc" | "about" => true,
+        "http" | "https" => url.host_str().is_some_and(|host| {
+            host == "localhost"
+                || host == "127.0.0.1"
+                || host == "::1"
+                || host.ends_with(".localhost")
+        }),
+        _ => false,
+    }
+}
+
+fn external_links<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("external-links")
+        .on_navigation(|webview: &Webview<R>, url| {
+            if is_app_navigation(url) {
+                return true;
+            }
+            if matches!(url.scheme(), "http" | "https" | "mailto") {
+                let _ = webview.opener().open_url(url.as_str(), None::<&str>);
+            }
+            false
+        })
+        .build()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(external_links());
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
@@ -35,6 +64,7 @@ pub fn run() {
             commands::fs_rename_path,
             commands::fs_save_image,
             commands::shell_show_item_in_folder,
+            commands::open_external_url,
             commands::theme_set,
             commands::window_close_allow,
             commands::window_close_deny,

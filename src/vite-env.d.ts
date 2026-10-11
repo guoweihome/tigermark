@@ -70,6 +70,7 @@ export interface TigerMarkApi {
   toFileUrl: (absolutePath: string) => string
   platform: string
   showItemInFolder: (targetPath: string) => Promise<ApiResult<void>>
+  openExternalUrl: (url: string) => Promise<void>
   onMenuOpenDirectory: (cb: () => void) => () => void
   onMenuSave: (cb: () => void) => () => void
   onMenuViewMode: (cb: (mode: string) => void) => () => void
