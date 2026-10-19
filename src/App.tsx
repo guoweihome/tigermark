@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileEntry, ViewMode } from './vite-env'
 import { ConfirmLeaveDialog } from './components/ConfirmLeaveDialog'
 import { FileTree } from './components/FileTree'
+import { GlobalSearch } from './components/GlobalSearch'
 import { MarkdownEditor, type MarkdownEditorHandle } from './components/MarkdownEditor'
 import { MarkdownPreview, type MarkdownPreviewHandle } from './components/MarkdownPreview'
 import { NameDialog } from './components/NameDialog'
@@ -163,6 +164,8 @@ export default function App() {
   const [fontFamily, setFontFamily] = useState(() => readUiPrefs().fontFamily)
   const [fontSize, setFontSize] = useState(() => readUiPrefs().fontSize)
   const [fileQuery, setFileQuery] = useState('')
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const [libraryVersion, setLibraryVersion] = useState(0)
   const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null)
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
   const savingRef = useRef(false)
@@ -185,6 +188,10 @@ export default function App() {
     null,
   )
   const confirmUnsavedRef = useRef<() => Promise<boolean>>(async () => true)
+  const globalSearchOpenRef = useRef(false)
+  const lastSearchToggleRef = useRef(0)
+  const jumpRef = useRef<{ path: string; line: number; query: string } | null>(null)
+  const viewModeRef = useRef(viewMode)
   const [leavePrompt, setLeavePrompt] = useState(false)
   const [isPhone, setIsPhone] = useState(isPhoneLayout)
   const [remoteName, setRemoteName] = useState<string | null>(
@@ -205,6 +212,8 @@ export default function App() {
   expandedPathsRef.current = expandedPaths
   sidebarOpenRef.current = sidebarOpen
   phoneRef.current = isPhone
+  globalSearchOpenRef.current = globalSearchOpen
+  viewModeRef.current = viewMode
 
   useEffect(() => {
     if (viewMode === 'preview') setFindTarget('preview')
@@ -273,6 +282,17 @@ export default function App() {
     }, 60)
   }, [])
 
+  const toggleGlobalSearch = useCallback(() => {
+    const now = Date.now()
+    if (now - lastSearchToggleRef.current < 120) return
+    lastSearchToggleRef.current = now
+    if (!rootPathRef.current) {
+      setStatus('请先打开文件夹')
+      return
+    }
+    setGlobalSearchOpen((open) => !open)
+  }, [])
+
   const openFind = useCallback(() => {
     const editorVisible = viewMode === 'edit' || viewMode === 'split'
     const previewVisible = viewMode === 'preview' || viewMode === 'split'
@@ -329,6 +349,7 @@ export default function App() {
       return null
     }
     setTree(result.data)
+    setLibraryVersion((version) => version + 1)
     return result.data
   }, [])
 
@@ -389,12 +410,12 @@ export default function App() {
         dirtyRef.current &&
         activePathRef.current !== filePath
       ) {
-        if (!(await confirmUnsavedRef.current())) return
+        if (!(await confirmUnsavedRef.current())) return false
       }
       const result = await window.tigermark.readFile(filePath)
       if (!result.ok || result.data === undefined) {
         setStatus(result.error ?? '读取文件失败')
-        return
+        return false
       }
       setActivePath(filePath)
       setContent(result.data)
@@ -402,9 +423,44 @@ export default function App() {
       persistSession({ activePath: filePath })
       if (!sidebarOpenRef.current) setSidebarPeeking(false)
       if (phoneRef.current) setSidebarOpen(false)
+      return true
     },
     [persistSession],
   )
+
+  const openGlobalMatch = useCallback(
+    async (match: { path: string; line: number | null; query: string }) => {
+      setGlobalSearchOpen(false)
+      const board = isBoardPath(match.path)
+      const jump =
+        !board && match.line
+          ? { path: match.path, line: match.line, query: match.query }
+          : null
+      jumpRef.current = jump
+      if (!board && jump && viewModeRef.current === 'preview') setViewMode('split')
+      if (pathsEqual(activePathRef.current, match.path)) {
+        if (jump && editorRef.current) {
+          editorRef.current.revealMatch(jump.line, jump.query)
+          jumpRef.current = null
+        }
+        return
+      }
+      const opened = await openFile(match.path)
+      if (!opened) jumpRef.current = null
+    },
+    [openFile],
+  )
+
+  useEffect(() => {
+    const jump = jumpRef.current
+    if (!jump || !activePath || !pathsEqual(jump.path, activePath) || isBoardPath(activePath)) return
+    const frame = window.requestAnimationFrame(() => {
+      if (!editorRef.current) return
+      editorRef.current.revealMatch(jump.line, jump.query)
+      if (jumpRef.current === jump) jumpRef.current = null
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activePath, content, viewMode])
 
   const saveFile = useCallback(async () => {
     const path = activePathRef.current
@@ -418,6 +474,7 @@ export default function App() {
         return false
       }
       if (contentRef.current === snapshot) setDirty(false)
+      setLibraryVersion((version) => version + 1)
       setStatus(`已保存 · ${basename(path)}`)
       return true
     } finally {
@@ -793,10 +850,13 @@ export default function App() {
         void refreshTree(root)
         return
       }
-      if (event.kind === 'write' && event.path && !dirtyRef.current) {
-        const target = toAbsolute(event.path)
-        if (pathsEqual(activePathRef.current, target)) {
-          void openFile(target, { skipUnsavedCheck: true })
+      if (event.kind === 'write' && event.path) {
+        setLibraryVersion((version) => version + 1)
+        if (!dirtyRef.current) {
+          const target = toAbsolute(event.path)
+          if (pathsEqual(activePathRef.current, target)) {
+            void openFile(target, { skipUnsavedCheck: true })
+          }
         }
       }
     })
@@ -866,14 +926,16 @@ export default function App() {
     })
     const offSidebar = window.tigermark.onMenuToggleSidebar?.(toggleSidebar)
     const offFind = window.tigermark.onMenuFind?.(openFind)
+    const offFindInFiles = window.tigermark.onMenuFindInFiles?.(toggleGlobalSearch)
     return () => {
       offOpen()
       offSave()
       offView()
       offSidebar?.()
       offFind?.()
+      offFindInFiles?.()
     }
-  }, [openDirectory, saveFile, toggleSidebar, openFind])
+  }, [openDirectory, saveFile, toggleSidebar, openFind, toggleGlobalSearch])
 
   useEffect(() => {
     const onCloseRequest = () => {
@@ -926,6 +988,7 @@ export default function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault()
+        if (globalSearchOpenRef.current) return
         focusFileSearch()
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
@@ -946,16 +1009,18 @@ export default function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault()
-        openFind()
+        if (e.shiftKey) toggleGlobalSearch()
+        else if (!globalSearchOpenRef.current) openFind()
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
         e.preventDefault()
+        if (globalSearchOpenRef.current) return
         findStep(e.shiftKey ? 'prev' : 'next')
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [saveFile, focusFileSearch, toggleSidebar, bumpFontSize, openFind, findStep])
+  }, [saveFile, focusFileSearch, toggleSidebar, bumpFontSize, openFind, findStep, toggleGlobalSearch])
 
   const onResizeStart = (e: { preventDefault(): void; clientX: number }) => {
     e.preventDefault()
@@ -1056,6 +1121,8 @@ export default function App() {
           }
           focusFileSearch()
         }}
+        searchOpen={globalSearchOpen}
+        onGlobalSearch={toggleGlobalSearch}
         fontFamily={fontFamily}
         onFontChange={setFontFamily}
         fontSize={fontSize}
@@ -1151,6 +1218,14 @@ export default function App() {
                   }
                 }}
               />
+              <button
+                type="button"
+                className="sidebar-search-global"
+                title={isMac ? '全文搜索（⌘⇧F）' : '全文搜索（Ctrl+Shift+F）'}
+                onClick={toggleGlobalSearch}
+              >
+                全文
+              </button>
             </div>
           )}
 
@@ -1280,6 +1355,8 @@ export default function App() {
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>P</kbd> 搜索文件
                 <span>·</span>
+                <kbd>⌘/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> 全文搜索
+                <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>F</kbd> 查找
                 <span>·</span>
                 <kbd>⌘/Ctrl</kbd>+<kbd>S</kbd> 保存
@@ -1323,6 +1400,19 @@ export default function App() {
         />
       )}
       {syncOpen && <SyncDialog onClose={() => setSyncOpen(false)} />}
+      {rootPath && (
+        <GlobalSearch
+          open={globalSearchOpen}
+          rootPath={rootPath}
+          libraryVersion={libraryVersion}
+          tree={tree}
+          activePath={activePath}
+          activeContent={content}
+          activeDirty={dirty}
+          onClose={() => setGlobalSearchOpen(false)}
+          onOpenMatch={(match) => void openGlobalMatch(match)}
+        />
+      )}
       {leavePrompt && (
         <ConfirmLeaveDialog
           fileName={activePath ? basename(activePath) : '未命名文件'}

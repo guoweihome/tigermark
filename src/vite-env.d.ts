@@ -76,6 +76,7 @@ export interface TigerMarkApi {
   onMenuViewMode: (cb: (mode: string) => void) => () => void
   onMenuToggleSidebar: (cb: () => void) => () => void
   onMenuFind: (cb: () => void) => () => void
+  onMenuFindInFiles: (cb: () => void) => () => void
   onCloseRequest: (cb: () => void) => () => void
   onHideRequest: (cb: () => void) => () => void
   onQuitRequest: (cb: () => void) => () => void

@@ -126,6 +126,7 @@ export function createRemoteApi(token: string): TigerMarkApi {
     onMenuViewMode: () => () => {},
     onMenuToggleSidebar: () => () => {},
     onMenuFind: () => () => {},
+    onMenuFindInFiles: () => () => {},
     onCloseRequest: () => () => {},
     onHideRequest: () => () => {},
     onQuitRequest: () => () => {},

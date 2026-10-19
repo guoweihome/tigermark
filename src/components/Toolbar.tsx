@@ -15,6 +15,7 @@ import {
   IconMoon,
   IconPlus,
   IconSave,
+  IconSearch,
   IconSidebar,
   IconSun,
   IconSync,
@@ -36,6 +37,8 @@ interface ToolbarProps {
   onThemeChange: (theme: ThemePreference) => void
   onNewFile: () => void
   onCommandCenter: () => void
+  searchOpen: boolean
+  onGlobalSearch: () => void
   fontFamily: string
   onFontChange: (font: string) => void
   fontSize: number
@@ -76,6 +79,8 @@ export function Toolbar({
   onThemeChange,
   onNewFile,
   onCommandCenter,
+  searchOpen,
+  onGlobalSearch,
   fontFamily,
   onFontChange,
   fontSize,
@@ -132,6 +137,15 @@ export function Toolbar({
           onClick={onToggleSidebar}
         >
           <IconSidebar />
+        </button>
+        <button
+          type="button"
+          className={`titlebar-btn${searchOpen ? ' active' : ''}`}
+          title={isMac ? '全文搜索（⌘⇧F）' : '全文搜索（Ctrl+Shift+F）'}
+          aria-pressed={searchOpen}
+          onClick={onGlobalSearch}
+        >
+          <IconSearch />
         </button>
         <button
           type="button"

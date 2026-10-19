@@ -49,6 +49,8 @@ pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     };
 
     let find = MenuItem::with_id(app, "find", "查找…", true, Some("CmdOrCtrl+F"))?;
+    let find_in_files =
+        MenuItem::with_id(app, "find-in-files", "全文搜索…", true, Some("CmdOrCtrl+Shift+F"))?;
     let edit = Submenu::with_items(
         app,
         "编辑",
@@ -63,6 +65,7 @@ pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::select_all(app, Some("全选"))?,
             &PredefinedMenuItem::separator(app)?,
             &find,
+            &find_in_files,
         ],
     )?;
 
@@ -134,6 +137,9 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         "find" => {
             let _ = app.emit("menu:find", ());
+        }
+        "find-in-files" => {
+            let _ = app.emit("menu:find-in-files", ());
         }
         "quit" => {
             let _ = app.emit("app:quit-request", ());

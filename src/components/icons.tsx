@@ -109,6 +109,15 @@ export function IconSync() {
   )
 }
 
+export function IconSearch() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="7" cy="7" r="3.6" />
+      <path d="M9.7 9.7 13 13" />
+    </svg>
+  )
+}
+
 export function IconNewFolder() {
   return (
     <svg {...iconProps}>

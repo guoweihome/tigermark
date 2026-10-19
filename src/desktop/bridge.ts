@@ -62,6 +62,7 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
     onMenuViewMode: (cb) => onEvent<string>('menu:view-mode', cb),
     onMenuToggleSidebar: (cb) => onEvent('menu:toggle-sidebar', () => cb()),
     onMenuFind: (cb) => onEvent('menu:find', () => cb()),
+    onMenuFindInFiles: (cb) => onEvent('menu:find-in-files', () => cb()),
     onCloseRequest: (cb) => onEvent('window:close-request', () => cb()),
     onHideRequest: (cb) => onEvent('window:hide-request', () => cb()),
     onQuitRequest: (cb) => onEvent('app:quit-request', () => cb()),

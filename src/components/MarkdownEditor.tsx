@@ -35,6 +35,7 @@ export type MarkdownEditorHandle = {
   openSearch: () => void
   findNext: () => void
   findPrev: () => void
+  revealMatch: (line: number, query: string) => void
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
@@ -169,6 +170,28 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       withView((view) => {
         if (!searchPanelOpen(view.state)) openSearchPanel(view)
         findPrevious(view)
+      }),
+    revealMatch: (line: number, query: string) =>
+      withView((view) => {
+        const doc = view.state.doc
+        if (line < 1 || line > doc.lines) return
+        const lineObj = doc.line(line)
+        const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+        const lower = lineObj.text.toLowerCase()
+        let best: { from: number; to: number } | null = null
+        for (const term of terms) {
+          const index = lower.indexOf(term)
+          if (index < 0) continue
+          const from = lineObj.from + index
+          if (!best || from < best.from) best = { from, to: from + term.length }
+        }
+        const from = best?.from ?? lineObj.from
+        const to = best?.to ?? lineObj.from
+        view.dispatch({
+          selection: { anchor: from, head: to },
+          effects: EditorView.scrollIntoView(from, { y: 'center' }),
+        })
+        view.focus()
       }),
   }))
 
