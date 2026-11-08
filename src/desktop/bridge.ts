@@ -2,13 +2,16 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   ApiResult,
-  DiscoveredPeer,
   FileEntry,
-  FollowReport,
+  OneDriveStatus,
+  OneDriveSyncReport,
   SavedImage,
-  SyncInfo,
   TigerMarkApi,
 } from '../vite-env'
+
+function invokeError(err: unknown) {
+  return typeof err === 'string' ? err : err instanceof Error ? err.message : '操作失败'
+}
 
 function onEvent<T>(event: string, cb: (payload: T) => void): () => void {
   let disposed = false
@@ -79,32 +82,49 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
       void invoke('app_quit')
     },
     setNativeTheme: (theme) => invoke('theme_set', { theme }),
-    isRemote: false,
-    getSyncInfo: () => invoke<SyncInfo>('sync_info').catch(() => null),
-    setSyncWorkspace: async (path) => {
-      await invoke('sync_set_workspace', { path })
-    },
-    setSyncSharing: (enabled) => invoke('sync_set_sharing', { enabled }),
-    discoverSync: () => invoke<DiscoveredPeer[]>('sync_discover').catch(() => []),
-    followSync: async (peer) => {
+    oneDriveStatus: async () => {
       try {
-        const data = await invoke<FollowReport>('sync_follow', {
-          host: peer.host,
-          port: peer.port,
-          token: peer.token,
+        const data = await invoke<OneDriveStatus>('onedrive_status')
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    oneDriveLogin: async () => {
+      try {
+        const data = await invoke<OneDriveStatus>('onedrive_login')
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    oneDriveLogout: async () => {
+      try {
+        await invoke('onedrive_logout')
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    oneDriveSetEnabled: async (enabled) => {
+      try {
+        const data = await invoke<OneDriveStatus>('onedrive_set_enabled', { enabled })
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    oneDriveSync: async (rootPath, skipPath) => {
+      try {
+        const data = await invoke<OneDriveSyncReport>('onedrive_sync', {
+          rootPath,
+          skipPath: skipPath ?? null,
         })
         return { ok: true, data }
       } catch (err) {
-        const error =
-          typeof err === 'string'
-            ? err
-            : err instanceof Error
-              ? err.message
-              : '同步失败'
-        return { ok: false, error }
+        return { ok: false, error: invokeError(err) }
       }
     },
-    onSync: (cb) => onEvent('sync:event', cb),
   }
 }
 

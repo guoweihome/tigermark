@@ -20,37 +20,19 @@ export interface SavedImage {
 
 export type ViewMode = 'edit' | 'split' | 'preview'
 
-export interface SyncEvent {
-  kind: string
-  path?: string
-  from?: string
-  name?: string
-  origin: string
+export interface OneDriveStatus {
+  connected: boolean
+  enabled: boolean
+  account: string
 }
 
-export interface SyncInfo {
-  port: number
-  token: string
-  host: string
-  pageUrl: string
-  clients: number
-  sharing: boolean
-  workspaceOpen: boolean
-  error?: string
-}
-
-export interface DiscoveredPeer {
-  host: string
-  port: number
-  token: string
-  name: string
-}
-
-export interface FollowReport {
-  following: boolean
-  pulled: boolean
-  files: number
-  name: string
+export interface OneDriveSyncReport {
+  account: string
+  folder: string
+  uploaded: number
+  downloaded: number
+  skipped: number
+  unsavedSkipped: boolean
 }
 
 export interface TigerMarkApi {
@@ -85,14 +67,14 @@ export interface TigerMarkApi {
   hideWindow: () => void
   quit: () => void
   setNativeTheme: (theme: 'light' | 'dark' | 'system') => Promise<void>
-  isRemote: boolean
-  workspaceName?: string
-  getSyncInfo: () => Promise<SyncInfo | null>
-  setSyncWorkspace: (path: string | null) => Promise<void>
-  setSyncSharing: (enabled: boolean) => Promise<void>
-  discoverSync: () => Promise<DiscoveredPeer[]>
-  followSync: (peer: DiscoveredPeer) => Promise<ApiResult<FollowReport>>
-  onSync: (cb: (event: SyncEvent) => void) => () => void
+  oneDriveStatus: () => Promise<ApiResult<OneDriveStatus>>
+  oneDriveLogin: () => Promise<ApiResult<OneDriveStatus>>
+  oneDriveLogout: () => Promise<ApiResult<void>>
+  oneDriveSetEnabled: (enabled: boolean) => Promise<ApiResult<OneDriveStatus>>
+  oneDriveSync: (
+    rootPath: string,
+    skipPath?: string | null,
+  ) => Promise<ApiResult<OneDriveSyncReport>>
 }
 
 interface QueryLocalFont {

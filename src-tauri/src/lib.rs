@@ -1,7 +1,7 @@
 mod commands;
 #[cfg(desktop)]
 mod menu;
-mod sync;
+mod onedrive;
 #[cfg(desktop)]
 mod updater;
 
@@ -70,21 +70,21 @@ pub fn run() {
             commands::window_close_deny,
             commands::window_hide,
             commands::app_quit,
-            sync::sync_info,
-            sync::sync_set_workspace,
-            sync::sync_set_sharing,
-            sync::sync_discover,
-            sync::sync_follow,
+            onedrive::onedrive_status,
+            onedrive::onedrive_login,
+            onedrive::onedrive_logout,
+            onedrive::onedrive_set_enabled,
+            onedrive::onedrive_sync,
         ])
         .setup(|app| {
-            let handle = app.handle().clone();
-            app.manage(sync::start(handle));
             #[cfg(desktop)]
             {
                 let handle = app.handle();
                 let menu = menu::build_menu(handle)?;
                 app.set_menu(menu)?;
             }
+            #[cfg(not(desktop))]
+            let _ = app;
             Ok(())
         });
 

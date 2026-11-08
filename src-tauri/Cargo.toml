@@ -1,6 +1,6 @@
 [package]
 name = "tigermark"
-version = "2.1.0"
+version = "2.2.0"
 description = "Cross-platform desktop Markdown editor"
 authors = ["tigermark"]
 license = "MIT"
@@ -15,14 +15,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-async-stream = "0.3"
-axum = { version = "0.7", features = ["macros"] }
 base64 = "0.22"
-futures-core = "0.3"
 getrandom = "0.2"
-include_dir = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "rustls-tls-native-roots"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

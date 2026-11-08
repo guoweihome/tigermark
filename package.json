@@ -1,16 +1,16 @@
 {
   "name": "tigermark",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Cross-platform desktop Markdown editor",
   "author": "tigermark",
   "license": "MIT",
   "scripts": {
-    "dev": "tauri dev",
+    "dev": "node scripts/with-macos-sdk.mjs tauri dev",
     "dev:vite": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
-    "dist": "TAURI_SIGNING_PRIVATE_KEY_PATH=\"${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/tigermark.key}\" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=\"${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}\" tauri build",
-    "dist:win": "TAURI_SIGNING_PRIVATE_KEY_PATH=\"${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/tigermark.key}\" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=\"${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}\" tauri build --bundles nsis",
+    "dist": "TAURI_SIGNING_PRIVATE_KEY_PATH=\"${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/tigermark.key}\" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=\"${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}\" node scripts/with-macos-sdk.mjs tauri build",
+    "dist:win": "TAURI_SIGNING_PRIVATE_KEY_PATH=\"${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/tigermark.key}\" TAURI_SIGNING_PRIVATE_KEY_PASSWORD=\"${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}\" node scripts/with-macos-sdk.mjs tauri build --bundles nsis",
     "tauri": "tauri"
   },
   "dependencies": {

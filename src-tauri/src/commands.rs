@@ -316,22 +316,17 @@ pub async fn fs_read_file(file_path: String) -> ApiResult<String> {
 }
 
 #[tauri::command]
-pub async fn fs_write_file(app: AppHandle, file_path: String, content: String) -> ApiResult<()> {
-    let event_path = file_path.clone();
+pub async fn fs_write_file(file_path: String, content: String) -> ApiResult<()> {
     let result = tauri::async_runtime::spawn_blocking(move || fs::write(file_path, content)).await;
     match result {
-        Ok(Ok(())) => {
-            crate::sync::notify(&app, "write", Some(&event_path), "desktop");
-            crate::sync::mirror_write(&app, &event_path);
-            ok(())
-        }
+        Ok(Ok(())) => ok(()),
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_create_file(app: AppHandle, dir_path: String, name: String) -> ApiResult<String> {
+pub async fn fs_create_file(dir_path: String, name: String) -> ApiResult<String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let file_name = new_file_name(&name)?;
         let file_path = Path::new(&dir_path).join(&file_name);
@@ -345,18 +340,14 @@ pub async fn fs_create_file(app: AppHandle, dir_path: String, name: String) -> A
     })
     .await;
     match result {
-        Ok(Ok(path)) => {
-            crate::sync::notify(&app, "tree", Some(&path), "desktop");
-            crate::sync::mirror_write(&app, &path);
-            ok(path)
-        }
+        Ok(Ok(path)) => ok(path),
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_create_directory(app: AppHandle, dir_path: String, name: String) -> ApiResult<String> {
+pub async fn fs_create_directory(dir_path: String, name: String) -> ApiResult<String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let folder_name = safe_entry_name(&name)?.to_string();
         let new_path = Path::new(&dir_path).join(folder_name);
@@ -365,19 +356,14 @@ pub async fn fs_create_directory(app: AppHandle, dir_path: String, name: String)
     })
     .await;
     match result {
-        Ok(Ok(path)) => {
-            crate::sync::notify(&app, "tree", Some(&path), "desktop");
-            crate::sync::mirror_mkdir(&app, &path);
-            ok(path)
-        }
+        Ok(Ok(path)) => ok(path),
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_delete_path(app: AppHandle, target_path: String) -> ApiResult<()> {
-    let event_path = target_path.clone();
+pub async fn fs_delete_path(target_path: String) -> ApiResult<()> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let path = PathBuf::from(target_path);
         let meta = fs::metadata(&path)?;
@@ -389,19 +375,14 @@ pub async fn fs_delete_path(app: AppHandle, target_path: String) -> ApiResult<()
     })
     .await;
     match result {
-        Ok(Ok(())) => {
-            crate::sync::notify(&app, "delete", Some(&event_path), "desktop");
-            crate::sync::mirror_delete(&app, &event_path);
-            ok(())
-        }
+        Ok(Ok(())) => ok(()),
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
 }
 
 #[tauri::command]
-pub async fn fs_rename_path(app: AppHandle, old_path: String, new_name: String) -> ApiResult<String> {
-    let from = old_path.clone();
+pub async fn fs_rename_path(old_path: String, new_name: String) -> ApiResult<String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let new_name = safe_entry_name(&new_name)?.to_string();
         let old = PathBuf::from(old_path);
@@ -415,11 +396,7 @@ pub async fn fs_rename_path(app: AppHandle, old_path: String, new_name: String) 
     })
     .await;
     match result {
-        Ok(Ok(path)) => {
-            crate::sync::notify_rename(&app, &from, &path);
-            crate::sync::mirror_rename(&app, &from, &path);
-            ok(path)
-        }
+        Ok(Ok(path)) => ok(path),
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }
@@ -427,7 +404,6 @@ pub async fn fs_rename_path(app: AppHandle, old_path: String, new_name: String) 
 
 #[tauri::command]
 pub async fn fs_save_image(
-    app: AppHandle,
     md_file_path: String,
     bytes: Vec<u8>,
     mime_type: String,
@@ -449,10 +425,7 @@ pub async fn fs_save_image(
     })
     .await;
     match result {
-        Ok(Ok(saved)) => {
-            crate::sync::mirror_write(&app, &saved.absolute_path);
-            ok(saved)
-        }
+        Ok(Ok(saved)) => ok(saved),
         Ok(Err(err)) => fail(err),
         Err(err) => fail(err),
     }

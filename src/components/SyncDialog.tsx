@@ -1,43 +1,87 @@
 import { useEffect, useState } from 'react'
-import type { SyncInfo } from '../vite-env'
+import type { OneDriveStatus } from '../vite-env'
 
 interface SyncDialogProps {
+  rootPath: string | null
+  skipPath: string | null
   onClose: () => void
+  onDidSync: () => void
 }
 
-export function SyncDialog({ onClose }: SyncDialogProps) {
-  const [info, setInfo] = useState<SyncInfo | null>(null)
-  const [copied, setCopied] = useState(false)
+export function SyncDialog({ rootPath, skipPath, onClose, onDidSync }: SyncDialogProps) {
+  const [drive, setDrive] = useState<OneDriveStatus | null>(null)
+  const [driveError, setDriveError] = useState('')
+  const [driveNote, setDriveNote] = useState('')
+  const [driveTask, setDriveTask] = useState<'' | 'login' | 'sync' | 'logout'>('')
+  const driveBusy = driveTask !== ''
 
   useEffect(() => {
     let stop = false
-    const tick = async () => {
-      const next = await window.tigermark.getSyncInfo()
-      if (!stop) setInfo(next)
-    }
-    void tick()
-    const timer = window.setInterval(() => void tick(), 2000)
+    void window.tigermark.oneDriveStatus().then((result) => {
+      if (stop) return
+      if (result.ok && result.data) setDrive(result.data)
+      else setDrive({ connected: false, enabled: false, account: '' })
+    })
     return () => {
       stop = true
-      window.clearInterval(timer)
     }
   }, [])
 
-  const setSharing = async (enabled: boolean) => {
-    await window.tigermark.setSyncSharing(enabled)
-    const next = await window.tigermark.getSyncInfo()
-    setInfo(next)
+  const connectDrive = async () => {
+    setDriveTask('login')
+    setDriveError('')
+    setDriveNote('')
+    const result = await window.tigermark.oneDriveLogin()
+    setDriveTask('')
+    if (!result.ok || !result.data) {
+      setDriveError(result.error ?? '连接 OneDrive 失败')
+      return
+    }
+    setDrive(result.data)
   }
 
-  const copy = async () => {
-    if (!info?.pageUrl) return
-    try {
-      await navigator.clipboard.writeText(info.pageUrl)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
+  const disconnectDrive = async () => {
+    setDriveTask('logout')
+    setDriveError('')
+    const result = await window.tigermark.oneDriveLogout()
+    setDriveTask('')
+    if (!result.ok) {
+      setDriveError(result.error ?? '断开失败')
+      return
     }
+    setDrive({ connected: false, enabled: false, account: '' })
+    setDriveNote('')
+  }
+
+  const syncDrive = async () => {
+    if (!rootPath) return
+    setDriveTask('sync')
+    setDriveError('')
+    setDriveNote('')
+    const result = await window.tigermark.oneDriveSync(rootPath, skipPath)
+    setDriveTask('')
+    if (!result.ok || !result.data) {
+      setDriveError(result.error ?? '同步失败')
+      return
+    }
+    const report = result.data
+    const unsaved = report.unsavedSkipped ? '当前未保存的文件这次没有同步。' : ''
+    setDriveNote(
+      `已同步到 ${report.folder}：上传 ${report.uploaded} 个，下载 ${report.downloaded} 个。${unsaved}`,
+    )
+    onDidSync()
+  }
+
+  const setDriveEnabled = async (enabled: boolean) => {
+    setDriveError('')
+    if (!enabled) setDriveNote('')
+    const result = await window.tigermark.oneDriveSetEnabled(enabled)
+    if (!result.ok || !result.data) {
+      setDriveError(result.error ?? '无法切换 OneDrive 同步')
+      return
+    }
+    setDrive(result.data)
+    if (enabled) await syncDrive()
   }
 
   return (
@@ -48,55 +92,72 @@ export function SyncDialog({ onClose }: SyncDialogProps) {
         aria-labelledby="sync-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 id="sync-title">局域网同步</h2>
+        <h2 id="sync-title">OneDrive 同步</h2>
         <p className="dialog-message">
-          两台设备连同一个 Wi-Fi。在这边点「开始同步」后，另一台 TigerMark 会自动发现并连上，把这边的笔记同步过去。电脑上开启就同步到手机，手机上开启就同步到电脑。
+          默认关闭。连接后还要开启同步，才会把当前文件夹和 OneDrive 的 TigerMark 目录对齐。较新的文件会覆盖较旧的，不会删除任何一边的文件。
         </p>
-        {info?.error ? (
-          <p className="sync-error">{info.error}</p>
-        ) : info?.sharing ? (
-          <button type="button" className="sync-url" onClick={() => void copy()}>
-            {info.pageUrl || '正在获取地址…'}
-          </button>
+        {!rootPath ? <p className="sync-error">请先打开一个文件夹，再开启同步。</p> : null}
+        {drive?.connected ? (
+          <p className="sync-meta">
+            已连接{drive.account ? `：${drive.account}` : ''}。
+            {drive.enabled ? '同步已开启。' : '同步尚未开启。'}
+          </p>
         ) : (
-          <p className="sync-meta">尚未开始。开始后，对方打开 TigerMark 就会自动连上。</p>
+          <p className="sync-meta">尚未连接。</p>
         )}
-        {info && !info.workspaceOpen && (
-          <p className="sync-error">请先打开一个文件夹，再把笔记同步出去。</p>
-        )}
-        <p className="sync-meta">
-          {info?.sharing
-            ? `正在同步 · 已连接 ${info.clients} 台设备`
-            : '未开启。对方若已开始同步，这边会自动接收'}
-          {info?.host ? ` · ${info.host}` : ''}
-        </p>
+        {driveError ? <p className="sync-error">{driveError}</p> : null}
+        {driveNote ? <p className="sync-meta">{driveNote}</p> : null}
         <div className="dialog-actions">
           <button type="button" className="tool-btn" onClick={onClose}>
             关闭
           </button>
-          {info?.sharing ? (
+          {!drive?.connected ? (
+            <button
+              type="button"
+              className="tool-btn primary"
+              disabled={driveBusy}
+              onClick={() => void connectDrive()}
+            >
+              {driveTask === 'login' ? '正在连接…' : '连接 OneDrive'}
+            </button>
+          ) : drive.enabled ? (
             <>
               <button
                 type="button"
                 className="tool-btn"
-                disabled={!info.pageUrl}
-                onClick={() => void copy()}
+                disabled={driveBusy}
+                onClick={() => void setDriveEnabled(false)}
               >
-                {copied ? '已复制' : '复制地址'}
-              </button>
-              <button type="button" className="tool-btn primary" onClick={() => void setSharing(false)}>
                 停止同步
+              </button>
+              <button
+                type="button"
+                className="tool-btn primary"
+                disabled={driveBusy || !rootPath}
+                onClick={() => void syncDrive()}
+              >
+                {driveTask === 'sync' ? '正在同步…' : '同步笔记'}
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              className="tool-btn primary"
-              disabled={!info?.workspaceOpen}
-              onClick={() => void setSharing(true)}
-            >
-              开始同步
-            </button>
+            <>
+              <button
+                type="button"
+                className="tool-btn"
+                disabled={driveBusy}
+                onClick={() => void disconnectDrive()}
+              >
+                {driveTask === 'logout' ? '正在断开…' : '断开'}
+              </button>
+              <button
+                type="button"
+                className="tool-btn primary"
+                disabled={driveBusy || !rootPath}
+                onClick={() => void setDriveEnabled(true)}
+              >
+                开始同步
+              </button>
+            </>
           )}
         </div>
       </div>

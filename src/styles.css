@@ -1535,22 +1535,9 @@ kbd {
 }
 
 .sync-dialog {
-  width: min(460px, calc(100vw - 32px));
-}
-
-.sync-url {
-  width: 100%;
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg-elevated);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.45;
-  text-align: left;
-  word-break: break-all;
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
 }
 
 .sync-meta,

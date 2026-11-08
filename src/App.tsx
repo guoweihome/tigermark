@@ -44,22 +44,9 @@ function isPhoneLayout() {
   return window.matchMedia('(max-width: 760px)').matches
 }
 
-function joinWorkspacePath(root: string, rel: string) {
-  const relative = rel.replace(/\\/g, '/')
-  if (!root || root === '.') return relative
-  const sep = root.includes('\\') ? '\\' : '/'
-  return `${root.replace(/[/\\]+$/, '')}${sep}${relative.replace(/\//g, sep)}`
-}
-
 function pathsEqual(left: string | null, right: string | null) {
   if (!left || !right) return false
   return left.replace(/\\/g, '/').replace(/\/+$/, '') === right.replace(/\\/g, '/').replace(/\/+$/, '')
-}
-
-function isInsidePath(parent: string, child: string) {
-  const base = parent.replace(/\\/g, '/').replace(/\/+$/, '')
-  const next = child.replace(/\\/g, '/')
-  return next === base || next.startsWith(`${base}/`)
 }
 
 function filterTree(entries: FileEntry[], query: string): FileEntry[] {
@@ -194,15 +181,8 @@ export default function App() {
   const viewModeRef = useRef(viewMode)
   const [leavePrompt, setLeavePrompt] = useState(false)
   const [isPhone, setIsPhone] = useState(isPhoneLayout)
-  const [remoteName, setRemoteName] = useState<string | null>(
-    () => window.tigermark?.workspaceName ?? null,
-  )
   const [syncOpen, setSyncOpen] = useState(false)
-  const [syncPeers, setSyncPeers] = useState(0)
-  const [linked, setLinked] = useState(false)
-  const [sessionSettled, setSessionSettled] = useState(false)
   const isMac = window.tigermark?.platform === 'darwin'
-  const isRemote = Boolean(window.tigermark?.isRemote)
   const phoneRef = useRef(isPhone)
 
   contentRef.current = content
@@ -367,18 +347,6 @@ export default function App() {
   )
 
   const openDirectory = useCallback(async () => {
-    if (window.tigermark.isRemote) {
-      const result = await window.tigermark.openDirectory()
-      if (!result.ok || !result.data) {
-        setStatus(result.error ?? '桌面端尚未打开文件夹')
-        return
-      }
-      setRemoteName(window.tigermark.workspaceName ?? null)
-      await refreshTree(result.data)
-      setRootPath(result.data)
-      setStatus(window.tigermark.workspaceName ? `已连接：${window.tigermark.workspaceName}` : '已连接桌面工作区')
-      return
-    }
     if (!(await confirmUnsavedRef.current())) return
     const result = await window.tigermark.openDirectory()
     if (!result.ok) {
@@ -682,60 +650,18 @@ export default function App() {
     [openFile, persistSession, refreshTree, rootPath],
   )
 
-  const loadRemoteWorkspace = useCallback(async () => {
-    const result = await window.tigermark.openDirectory()
-    if (!result.ok || !result.data) {
-      setRootPath(null)
-      setTree([])
-      setActivePath(null)
-      setContent('')
-      setDirty(false)
-      setRemoteName(null)
-      setStatus(result.error ?? '等待桌面端打开文件夹')
-      return
-    }
-    const name = window.tigermark.workspaceName ?? null
-    setRemoteName(name)
-    const entries = await refreshTree(result.data)
-    if (!entries) return
-    setRootPath(result.data)
-    setStatus(name ? `已连接：${name}` : '已连接桌面工作区')
-    const session = readSession()
-    if (session?.rootPath === result.data) {
-      setExpandedPaths(new Set(session.expandedPaths))
-      if (session.activePath && !dirtyRef.current) {
-        const file = await window.tigermark.readFile(session.activePath)
-        if (file.ok && file.data !== undefined) {
-          setActivePath(session.activePath)
-          setContent(file.data)
-          setDirty(false)
-        }
-      }
-    }
-    persistSession({ rootPath: result.data })
-  }, [persistSession, refreshTree])
-
   useEffect(() => {
     if (sessionReadyRef.current) return
     sessionReadyRef.current = true
 
-    if (window.tigermark.isRemote) {
-      void loadRemoteWorkspace().finally(() => setSessionSettled(true))
-      return
-    }
-
     const session = readSession()
-    if (!session) {
-      setSessionSettled(true)
-      return
-    }
+    if (!session) return
 
     void (async () => {
       const entries = await refreshTree(session.rootPath)
       if (!entries) {
         clearSession()
         setStatus('上次打开的目录已失效，请重新选择')
-        setSessionSettled(true)
         return
       }
       setRootPath(session.rootPath)
@@ -755,165 +681,8 @@ export default function App() {
           })
         }
       }
-      setSessionSettled(true)
     })()
-  }, [loadRemoteWorkspace, persistSession, refreshTree])
-
-  useEffect(() => {
-    if (!sessionSettled || window.tigermark.isRemote) return
-    void window.tigermark.setSyncWorkspace(rootPath)
-  }, [sessionSettled, rootPath])
-
-  useEffect(() => {
-    if (window.tigermark.isRemote) {
-      setSyncPeers(1)
-      return
-    }
-    let stop = false
-    const tick = async () => {
-      const info = await window.tigermark.getSyncInfo()
-      if (stop || !info) return
-      setSyncPeers((current) => (current === info.clients ? current : info.clients))
-    }
-    void tick()
-    const timer = window.setInterval(() => void tick(), 2000)
-    return () => {
-      stop = true
-      window.clearInterval(timer)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!dirty || !activePath) return
-    if (!window.tigermark.isRemote && syncPeers < 1 && !linked) return
-    const timer = window.setTimeout(() => {
-      void saveFile()
-    }, 1000)
-    return () => window.clearTimeout(timer)
-  }, [dirty, content, activePath, syncPeers, linked, saveFile])
-
-  useEffect(() => {
-    const toAbsolute = (rel: string) => joinWorkspacePath(rootPathRef.current ?? '.', rel)
-    return window.tigermark.onSync((event) => {
-      if (!window.tigermark.isRemote && event.origin === 'desktop') return
-      if (window.tigermark.isRemote && event.origin !== 'desktop' && event.kind !== 'workspace') {
-        const own = sessionStorage.getItem('tigermark.clientId')
-        if (own && event.origin === own) return
-      }
-      if (event.kind === 'reload') {
-        const root = rootPathRef.current
-        if (!root) return
-        void (async () => {
-          await refreshTree(root)
-          const active = activePathRef.current
-          if (active) await openFile(active, { skipUnsavedCheck: true })
-        })()
-        return
-      }
-      if (event.kind === 'workspace') {
-        if (window.tigermark.isRemote) void loadRemoteWorkspace()
-        return
-      }
-      const root = rootPathRef.current
-      if (!root) return
-      if (event.kind === 'tree') {
-        void refreshTree(root)
-        return
-      }
-      if (event.kind === 'delete' && event.path) {
-        const target = toAbsolute(event.path)
-        const active = activePathRef.current
-        if (active && (pathsEqual(active, target) || isInsidePath(target, active))) {
-          setActivePath(null)
-          setContent('')
-          setDirty(false)
-          persistSession({ activePath: null })
-        }
-        void refreshTree(root)
-        return
-      }
-      if (event.kind === 'rename' && event.from && event.path) {
-        const from = toAbsolute(event.from)
-        const next = toAbsolute(event.path)
-        const active = activePathRef.current
-        if (active && pathsEqual(active, from)) {
-          setActivePath(next)
-          persistSession({ activePath: next })
-        } else if (active && isInsidePath(from, active)) {
-          const suffix = active.replace(/\\/g, '/').slice(from.replace(/\\/g, '/').length)
-          const joined = `${next.replace(/\\/g, '/')}${suffix}`
-          const useBackslash = (rootPathRef.current ?? '').includes('\\')
-          const restored = useBackslash ? joined.replace(/\//g, '\\') : joined
-          setActivePath(restored)
-          persistSession({ activePath: restored })
-        }
-        void refreshTree(root)
-        return
-      }
-      if (event.kind === 'write' && event.path) {
-        setLibraryVersion((version) => version + 1)
-        if (!dirtyRef.current) {
-          const target = toAbsolute(event.path)
-          if (pathsEqual(activePathRef.current, target)) {
-            void openFile(target, { skipUnsavedCheck: true })
-          }
-        }
-      }
-    })
-  }, [loadRemoteWorkspace, openFile, persistSession, refreshTree])
-
-  useEffect(() => {
-    if (!sessionSettled || window.tigermark.isRemote) return
-    let stop = false
-    let busy = false
-    let lastError = ''
-    const tick = async () => {
-      if (stop || busy) return
-      const info = await window.tigermark.getSyncInfo()
-      if (stop) return
-      if (!info || info.sharing) {
-        setLinked(false)
-        return
-      }
-      if (!rootPathRef.current && window.tigermark.platform === 'android') {
-        await openDirectory()
-      }
-      const root = rootPathRef.current
-      if (!root) return
-      const peers = await window.tigermark.discoverSync()
-      const peer = peers[0]
-      if (!peer) return
-      busy = true
-      try {
-        await window.tigermark.setSyncWorkspace(root)
-        const result = await window.tigermark.followSync(peer)
-        if (stop) return
-        if (!result.ok || !result.data) {
-          const message = result.error ?? '同步失败'
-          if (message !== lastError) {
-            lastError = message
-            setStatus(message)
-          }
-          setLinked(false)
-          return
-        }
-        lastError = ''
-        setLinked(true)
-        if (result.data.pulled) {
-          const from = result.data.name || peer.name
-          setStatus(from ? `已从「${from}」同步 ${result.data.files} 个文件` : '已同步笔记')
-        }
-      } finally {
-        busy = false
-      }
-    }
-    void tick()
-    const timer = window.setInterval(() => void tick(), 2000)
-    return () => {
-      stop = true
-      window.clearInterval(timer)
-    }
-  }, [openDirectory, sessionSettled, setStatus])
+  }, [persistSession, refreshTree])
 
   useEffect(() => {
     if (!window.tigermark?.onMenuOpenDirectory) return
@@ -1089,10 +858,10 @@ export default function App() {
   const showEditor = viewMode === 'edit' || viewMode === 'split'
   const showPreview = viewMode === 'preview' || viewMode === 'split'
   const boardActive = Boolean(activePath && isBoardPath(activePath))
-  const folderLabel = rootPath ? remoteName || (rootPath === '.' ? '工作区' : basename(rootPath)) : null
+  const folderLabel = rootPath ? (rootPath === '.' ? '工作区' : basename(rootPath)) : null
 
   return (
-    <div className={`app${isMac ? ' is-mac' : ''}${isPhone ? ' is-phone' : ''}${isRemote ? ' is-remote' : ''}`}>
+    <div className={`app${isMac ? ' is-mac' : ''}${isPhone ? ' is-phone' : ''}`}>
       <Toolbar
         isMac={isMac}
         fileName={activePath ? basename(activePath).replace(/\.board\.json$/i, '') : null}
@@ -1127,8 +896,6 @@ export default function App() {
         onFontChange={setFontFamily}
         fontSize={fontSize}
         onFontSizeChange={(size) => setFontSize(clampFontSize(size))}
-        isRemote={isRemote}
-        syncPeers={syncPeers}
         boardActive={boardActive}
         onNewBoard={() => {
           if (!rootPath) {
@@ -1243,9 +1010,7 @@ export default function App() {
                   onDelete={deleteEntry}
                   onRename={renameEntry}
                   onReveal={(entry) => void revealInFolder(entry)}
-                  revealLabel={
-                    isRemote ? '' : revealInFolderLabel(window.tigermark?.platform ?? '')
-                  }
+                  revealLabel={revealInFolderLabel(window.tigermark?.platform ?? '')}
                   expandedPaths={expandedPaths}
                   onToggleExpand={toggleExpand}
                   expandAll={hasFilter}
@@ -1253,9 +1018,9 @@ export default function App() {
               )
             ) : (
               <div className="empty-sidebar">
-                <p>{isRemote ? '等待桌面端打开文件夹' : '打开本地文件夹'}</p>
+                <p>打开本地文件夹</p>
                 <button type="button" className="primary-btn" onClick={() => void openDirectory()}>
-                  {isRemote ? '重新连接' : '选择目录'}
+                  选择目录
                 </button>
               </div>
             )}
@@ -1344,12 +1109,8 @@ export default function App() {
           ) : (
             <div className="empty-editor">
               <h1>TigerMark</h1>
-              <p>
-                {isRemote
-                  ? '连接桌面端后，在这里查看和编辑同一份笔记'
-                  : '左侧打开目录，选择 Markdown 文件开始写作'}
-              </p>
-              {!isPhone && !isRemote && (
+              <p>左侧打开目录，选择 Markdown 文件开始写作</p>
+              {!isPhone && (
               <div className="hint-row">
                 <kbd>⌘/Ctrl</kbd>+<kbd>B</kbd> 侧边栏
                 <span>·</span>
@@ -1399,7 +1160,19 @@ export default function App() {
           onCancel={() => setNamePrompt(null)}
         />
       )}
-      {syncOpen && <SyncDialog onClose={() => setSyncOpen(false)} />}
+      {syncOpen && (
+        <SyncDialog
+          rootPath={rootPath}
+          skipPath={dirty && activePath ? activePath : null}
+          onClose={() => setSyncOpen(false)}
+          onDidSync={() => {
+            const root = rootPathRef.current
+            if (root) void refreshTree(root)
+            const active = activePathRef.current
+            if (active && !dirtyRef.current) void openFile(active, { skipUnsavedCheck: true })
+          }}
+        />
+      )}
       {rootPath && (
         <GlobalSearch
           open={globalSearchOpen}

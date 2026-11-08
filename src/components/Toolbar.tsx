@@ -43,8 +43,6 @@ interface ToolbarProps {
   onFontChange: (font: string) => void
   fontSize: number
   onFontSizeChange: (size: number) => void
-  isRemote: boolean
-  syncPeers: number
   boardActive: boolean
   onNewBoard: () => void
   onOpenSync: () => void
@@ -85,8 +83,6 @@ export function Toolbar({
   onFontChange,
   fontSize,
   onFontSizeChange,
-  isRemote,
-  syncPeers,
   boardActive,
   onNewBoard,
   onOpenSync,
@@ -262,16 +258,14 @@ export function Toolbar({
         </>
         )}
 
-        {!isRemote && (
-          <button
-            type="button"
-            className={`titlebar-btn${syncPeers > 0 ? ' accent' : ''}`}
-            title={syncPeers > 0 ? `局域网同步（${syncPeers} 台设备）` : '局域网同步'}
-            onClick={onOpenSync}
-          >
-            <IconSync />
-          </button>
-        )}
+        <button
+          type="button"
+          className="titlebar-btn"
+          title="OneDrive 同步"
+          onClick={onOpenSync}
+        >
+          <IconSync />
+        </button>
 
         <button
           type="button"
