@@ -26,4 +26,9 @@ commands.allow = [
   "onedrive_logout",
   "onedrive_set_enabled",
   "onedrive_sync",
+  "jianguoyun_status",
+  "jianguoyun_connect",
+  "jianguoyun_logout",
+  "jianguoyun_set_enabled",
+  "jianguoyun_sync",
 ]

@@ -3,6 +3,8 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   ApiResult,
   FileEntry,
+  NutstoreStatus,
+  NutstoreSyncReport,
   OneDriveStatus,
   OneDriveSyncReport,
   SavedImage,
@@ -117,6 +119,49 @@ export function createTigerMarkApi(platform: string): TigerMarkApi {
     oneDriveSync: async (rootPath, skipPath) => {
       try {
         const data = await invoke<OneDriveSyncReport>('onedrive_sync', {
+          rootPath,
+          skipPath: skipPath ?? null,
+        })
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    nutstoreStatus: async () => {
+      try {
+        const data = await invoke<NutstoreStatus>('jianguoyun_status')
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    nutstoreConnect: async (account, password) => {
+      try {
+        const data = await invoke<NutstoreStatus>('jianguoyun_connect', { account, password })
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    nutstoreLogout: async () => {
+      try {
+        await invoke('jianguoyun_logout')
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    nutstoreSetEnabled: async (enabled) => {
+      try {
+        const data = await invoke<NutstoreStatus>('jianguoyun_set_enabled', { enabled })
+        return { ok: true, data }
+      } catch (err) {
+        return { ok: false, error: invokeError(err) }
+      }
+    },
+    nutstoreSync: async (rootPath, skipPath) => {
+      try {
+        const data = await invoke<NutstoreSyncReport>('jianguoyun_sync', {
           rootPath,
           skipPath: skipPath ?? null,
         })

@@ -1551,6 +1551,17 @@ kbd {
   color: var(--danger);
 }
 
+.sync-split {
+  margin: 4px 0 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.sync-subtitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
 .whiteboard {
   display: flex;
   flex-direction: column;

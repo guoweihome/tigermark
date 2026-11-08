@@ -261,7 +261,7 @@ export function Toolbar({
         <button
           type="button"
           className="titlebar-btn"
-          title="OneDrive 同步"
+          title="同步"
           onClick={onOpenSync}
         >
           <IconSync />

@@ -1,6 +1,7 @@
 mod commands;
 #[cfg(desktop)]
 mod menu;
+mod jianguoyun;
 mod onedrive;
 #[cfg(desktop)]
 mod updater;
@@ -75,6 +76,11 @@ pub fn run() {
             onedrive::onedrive_logout,
             onedrive::onedrive_set_enabled,
             onedrive::onedrive_sync,
+            jianguoyun::jianguoyun_status,
+            jianguoyun::jianguoyun_connect,
+            jianguoyun::jianguoyun_logout,
+            jianguoyun::jianguoyun_set_enabled,
+            jianguoyun::jianguoyun_sync,
         ])
         .setup(|app| {
             #[cfg(desktop)]

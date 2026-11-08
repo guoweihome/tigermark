@@ -35,6 +35,21 @@ export interface OneDriveSyncReport {
   unsavedSkipped: boolean
 }
 
+export interface NutstoreStatus {
+  connected: boolean
+  enabled: boolean
+  account: string
+}
+
+export interface NutstoreSyncReport {
+  account: string
+  folder: string
+  uploaded: number
+  downloaded: number
+  skipped: number
+  unsavedSkipped: boolean
+}
+
 export interface TigerMarkApi {
   openDirectory: () => Promise<ApiResult<string | null>>
   readDirectory: (dirPath: string) => Promise<ApiResult<FileEntry[]>>
@@ -75,6 +90,14 @@ export interface TigerMarkApi {
     rootPath: string,
     skipPath?: string | null,
   ) => Promise<ApiResult<OneDriveSyncReport>>
+  nutstoreStatus: () => Promise<ApiResult<NutstoreStatus>>
+  nutstoreConnect: (account: string, password: string) => Promise<ApiResult<NutstoreStatus>>
+  nutstoreLogout: () => Promise<ApiResult<void>>
+  nutstoreSetEnabled: (enabled: boolean) => Promise<ApiResult<NutstoreStatus>>
+  nutstoreSync: (
+    rootPath: string,
+    skipPath?: string | null,
+  ) => Promise<ApiResult<NutstoreSyncReport>>
 }
 
 interface QueryLocalFont {
