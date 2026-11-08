@@ -1,6 +1,6 @@
 [package]
 name = "tigermark"
-version = "2.3.1"
+version = "2.3.2"
 description = "Cross-platform desktop Markdown editor"
 authors = ["tigermark"]
 license = "MIT"
